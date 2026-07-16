@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { Post } from "@/types/database";
 import PostCard from "./PostCard";
+import StoriesBar from "./StoriesBar";
 
 const PAGE_SIZE = 10;
 
@@ -46,7 +47,9 @@ export default function HomeFeed() {
   }
 
   return (
-    <div className="px-3 pt-3">
+    <div>
+      <StoriesBar />
+      <div className="px-3 pt-3">
       {posts.map((post) => (
         <PostCard key={post.id} post={post} />
       ))}
@@ -59,13 +62,16 @@ export default function HomeFeed() {
           Load more
         </button>
       )}
+      </div>
     </div>
   );
 }
 
 function FeedSkeleton() {
   return (
-    <div className="px-3 pt-3">
+    <div>
+      <StoriesBar />
+      <div className="px-3 pt-3">
       {Array.from({ length: 3 }).map((_, i) => (
         <div key={i} className="mb-4 animate-pulse overflow-hidden rounded-xl2 glass-card">
           <div className="flex items-center gap-3 px-4 py-3">

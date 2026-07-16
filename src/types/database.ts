@@ -97,3 +97,34 @@ export interface Database {
     CompositeTypes: { [_ in never]: never };
   };
 }
+
+export type FollowStatus = "pending" | "accepted";
+
+export interface Like {
+  post_id: string;
+  user_id: string;
+  created_at: string;
+}
+
+export interface SavedPost {
+  post_id: string;
+  user_id: string;
+  created_at: string;
+}
+
+export interface Comment {
+  id: string;
+  post_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  profiles?: Pick<Profile, "username" | "avatar_url">;
+}
+
+export interface Follow {
+  follower_id: string;
+  following_id: string;
+  status: FollowStatus;
+  created_at: string;
+  profiles?: Profile; // joined profile of whichever side the query selected
+}

@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import type { Post } from "@/types/database";
 import TapToPlayVideo from "./TapToPlayVideo";
+import PostActions from "./PostActions";
 
 function timeAgo(dateString: string): string {
   const seconds = Math.floor((Date.now() - new Date(dateString).getTime()) / 1000);
@@ -16,24 +18,22 @@ function timeAgo(dateString: string): string {
 }
 
 export default function PostCard({ post }: { post: Post }) {
+  const username = post.profiles?.username;
+
   return (
     <article className="mb-4 overflow-hidden rounded-xl2 glass-card shadow-sm">
-      {/* Author row */}
-      <div className="flex items-center gap-3 px-4 py-3">
+      <Link href={username ? `/profile/${username}` : "#"} className="flex items-center gap-3 px-4 py-3">
         <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-brand-gradient">
           {post.profiles?.avatar_url && (
             <img src={post.profiles.avatar_url} alt="" className="h-full w-full object-cover" />
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">
-            {post.profiles?.username ?? "unknown"}
-          </p>
+          <p className="truncate text-sm font-semibold">{username ?? "unknown"}</p>
         </div>
         <span className="shrink-0 text-xs text-ink-muted">{timeAgo(post.created_at)}</span>
-      </div>
+      </Link>
 
-      {/* Media */}
       {post.media_type === "video" ? (
         <TapToPlayVideo
           videoUrl={post.media_url}
@@ -46,16 +46,15 @@ export default function PostCard({ post }: { post: Post }) {
           alt={post.caption ?? ""}
           loading="lazy"
           className="w-full object-cover"
-          style={{
-            aspectRatio: post.width && post.height ? post.width / post.height : 4 / 5,
-          }}
+          style={{ aspectRatio: post.width && post.height ? post.width / post.height : 4 / 5 }}
         />
       )}
 
-      {/* Caption */}
+      <PostActions postId={post.id} />
+
       {post.caption && (
-        <p className="px-4 py-3 text-sm leading-snug">
-          <span className="mr-1.5 font-semibold">{post.profiles?.username}</span>
+        <p className="px-4 pb-3 text-sm leading-snug">
+          <span className="mr-1.5 font-semibold">{username}</span>
           {post.caption}
         </p>
       )}

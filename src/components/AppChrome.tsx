@@ -8,7 +8,7 @@ const NAV_ITEMS = [
   { href: "/", label: "Home", icon: "M3 11l9-8 9 8M5 10v10h14V10" },
   { href: "/chat", label: "Chat", icon: "M21 11.5a8.38 8.38 0 01-8.5 8.5 8.5 8.5 0 01-4-1L3 20l1-5.5A8.38 8.38 0 0112 3a8.38 8.38 0 019 8.5z" },
   { href: "/create", label: "Create", icon: "M12 5v14M5 12h14", special: true },
-  { href: "/profile/account-health", label: "Health", icon: "M12 21s-7-4.35-9.5-8.5C.7 8.9 2.2 5 6 5c2 0 3.3 1 4 2 .7-1 2-2 4-2 3.8 0 5.3 3.9 3.5 7.5C19 16.65 12 21 12 21z" },
+  { href: "/friends", label: "Friends", icon: "M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m5-5a4 4 0 100-8 4 4 0 000 8zm7 3a4 4 0 00-3-3.87M4 12.13A4 4 0 017 8.26" },
 ];
 
 export default function AppChrome({ children }: { children: React.ReactNode }) {
