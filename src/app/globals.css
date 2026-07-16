@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+@layer base {
+  body {
+    @apply bg-surface-lightMuted text-ink-light dark:bg-surface-darkMuted dark:text-ink-dark
+           font-body antialiased transition-colors duration-200;
+  }
+
+  h1, h2, h3 {
+    @apply font-display;
+  }
+
+  /* visible keyboard focus everywhere — accessibility floor */
+  :focus-visible {
+    outline: 2px solid #17C3EC;
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  .glass-card {
+    @apply bg-white/80 dark:bg-surface-dark/80 backdrop-blur-md
+           border border-black/5 dark:border-white/5;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
