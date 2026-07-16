@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, Inter } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
+import AuthHeaderControl from "@/components/AuthHeaderControl";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <h1 className="bg-brand-gradient bg-clip-text text-xl font-bold text-transparent">
               pictogram
             </h1>
+            <AuthHeaderControl />
           </div>
         </header>
 
