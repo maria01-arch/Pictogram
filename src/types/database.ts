@@ -70,9 +70,6 @@ export interface Message {
   profiles?: Pick<Profile, "username" | "avatar_url">;
 }
 
-// Every table needs Row/Insert/Update/Relationships to satisfy
-// @supabase/supabase-js's generic constraints — omitting Relationships
-// causes update()/insert() argument types to silently collapse to `never`.
 type TableDef<Row> = {
   Row: Row;
   Insert: Partial<Row>;
@@ -90,9 +87,13 @@ export interface Database {
       conversations: TableDef<Conversation>;
       messages: TableDef<Message>;
     };
-    Views: Record<string, never>;
-    Functions: Record<string, never>;
-    Enums: Record<string, never>;
-    CompositeTypes: Record<string, never>;
+    // Matches the shape Supabase's own `supabase gen types` output uses for
+    // "nothing here" — a real empty object, NOT Record<string, never>
+    // (which is an index signature that maps every key to never and was
+    // the actual cause of the update()/insert() "never" type errors).
+    Views: { [_ in never]: never };
+    Functions: { [_ in never]: never };
+    Enums: { [_ in never]: never };
+    CompositeTypes: { [_ in never]: never };
   };
 }
