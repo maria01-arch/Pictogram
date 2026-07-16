@@ -70,12 +70,14 @@ export interface Message {
   profiles?: Pick<Profile, "username" | "avatar_url">;
 }
 
-// Generic helper: every table accepts partial inserts/updates of its Row shape.
-// This is what @supabase/ssr's typed client needs to stop inferring `never`.
+// Every table needs Row/Insert/Update/Relationships to satisfy
+// @supabase/supabase-js's generic constraints — omitting Relationships
+// causes update()/insert() argument types to silently collapse to `never`.
 type TableDef<Row> = {
   Row: Row;
   Insert: Partial<Row>;
   Update: Partial<Row>;
+  Relationships: [];
 };
 
 export interface Database {
@@ -88,5 +90,9 @@ export interface Database {
       conversations: TableDef<Conversation>;
       messages: TableDef<Message>;
     };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: Record<string, never>;
+    CompositeTypes: Record<string, never>;
   };
 }
