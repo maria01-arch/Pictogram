@@ -35,43 +35,40 @@ export default function HomeFeed() {
     loadPosts();
   }, []);
 
-  if (loading) return <FeedSkeleton />;
-
-  if (posts.length === 0) {
-    return (
-      <div className="flex flex-col items-center gap-2 px-6 py-24 text-center text-ink-muted">
-        <p className="text-lg font-semibold">Nothing here yet</p>
-        <p className="text-sm">Follow a few creators or post something to get your feed going.</p>
-      </div>
-    );
-  }
-
   return (
     <div>
       <StoriesBar />
-      <div className="px-3 pt-3">
-      {posts.map((post) => (
-        <PostCard key={post.id} post={post} />
-      ))}
 
-      {hasMore && (
-        <button
-          onClick={() => loadPosts(posts.length)}
-          className="mb-6 w-full rounded-xl2 border border-black/10 py-2.5 text-sm font-medium text-ink-muted transition hover:border-brand-from hover:text-brand-from dark:border-white/10"
-        >
-          Load more
-        </button>
+      {loading ? (
+        <FeedSkeleton />
+      ) : posts.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 px-6 py-24 text-center text-ink-muted">
+          <p className="text-lg font-semibold">Nothing here yet</p>
+          <p className="text-sm">Follow a few creators or post something to get your feed going.</p>
+        </div>
+      ) : (
+        <div className="px-3 pt-3">
+          {posts.map((post) => (
+            <PostCard key={post.id} post={post} />
+          ))}
+
+          {hasMore && (
+            <button
+              onClick={() => loadPosts(posts.length)}
+              className="mb-6 w-full rounded-xl2 border border-black/10 py-2.5 text-sm font-medium text-ink-muted transition hover:border-brand-from hover:text-brand-from dark:border-white/10"
+            >
+              Load more
+            </button>
+          )}
+        </div>
       )}
-      </div>
     </div>
   );
 }
 
 function FeedSkeleton() {
   return (
-    <div>
-      <StoriesBar />
-      <div className="px-3 pt-3">
+    <div className="px-3 pt-3">
       {Array.from({ length: 3 }).map((_, i) => (
         <div key={i} className="mb-4 animate-pulse overflow-hidden rounded-xl2 glass-card">
           <div className="flex items-center gap-3 px-4 py-3">
