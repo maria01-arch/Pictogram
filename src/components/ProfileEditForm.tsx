@@ -36,7 +36,7 @@ export default function ProfileEditForm() {
         setProfile(data);
         setDisplayName(data.display_name ?? "");
         setBio(data.bio ?? "");
-        setLocation((data as any).location ?? "");
+        setLocation(data.location ?? "");
         setAvatarPreview(data.avatar_url);
       }
       setLoading(false);

@@ -11,6 +11,8 @@ export interface Profile {
   avatar_url: string | null;
   bio: string | null;
   is_business: boolean;
+  location: string | null;
+  requires_follow_approval: boolean;
   created_at: string;
   updated_at: string;
 }

@@ -88,8 +88,8 @@ export default function ProfileView({ username }: { username: string }) {
         <h2 className="mt-3 text-lg font-bold">{profile.display_name ?? profile.username}</h2>
         <p className="text-sm text-ink-muted">@{profile.username}</p>
         {profile.bio && <p className="mt-2 max-w-xs text-center text-sm">{profile.bio}</p>}
-        {(profile as any).location && (
-          <p className="mt-1 text-xs text-ink-muted">📍 {(profile as any).location}</p>
+        {profile.location && (
+          <p className="mt-1 text-xs text-ink-muted">📍 {profile.location}</p>
         )}
 
         {!isSelf && (
