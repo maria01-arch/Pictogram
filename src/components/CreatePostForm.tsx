@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { uploadPost, uploadStory, type UploadStage } from "@/lib/uploadMedia";
+import { getErrorMessage } from "@/lib/errorMessage";
 
 const STAGE_LABEL: Record<UploadStage, string> = {
   compressing: "Compressing your media\u2026",
@@ -49,7 +50,7 @@ export default function CreatePostForm() {
       router.push("/");
     } catch (err) {
       setStage(null);
-      setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
+      setError(getErrorMessage(err));
     }
   }
 
