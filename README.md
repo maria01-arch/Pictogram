@@ -99,3 +99,4 @@ supabase db execute -f supabase/schema.sql
    objects on a timer.
 5. **Chat** — `conversations` / `conversation_participants` / `messages`
    tables, realtime via `supabase.channel(...).on('postgres_changes', ...)`.
+
