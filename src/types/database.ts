@@ -26,7 +26,6 @@ export interface Post {
   width: number | null;
   height: number | null;
   created_at: string;
-  // joined at query time
   profiles?: Pick<Profile, "username" | "avatar_url">;
 }
 
@@ -71,17 +70,23 @@ export interface Message {
   profiles?: Pick<Profile, "username" | "avatar_url">;
 }
 
-// Minimal Database interface shape for @supabase/ssr generics.
-// Replace with the full generated type when available.
+// Generic helper: every table accepts partial inserts/updates of its Row shape.
+// This is what @supabase/ssr's typed client needs to stop inferring `never`.
+type TableDef<Row> = {
+  Row: Row;
+  Insert: Partial<Row>;
+  Update: Partial<Row>;
+};
+
 export interface Database {
   public: {
     Tables: {
-      profiles: { Row: Profile };
-      posts: { Row: Post };
-      stories: { Row: Story };
-      account_strikes: { Row: AccountStrike };
-      conversations: { Row: Conversation };
-      messages: { Row: Message };
+      profiles: TableDef<Profile>;
+      posts: TableDef<Post>;
+      stories: TableDef<Story>;
+      account_strikes: TableDef<AccountStrike>;
+      conversations: TableDef<Conversation>;
+      messages: TableDef<Message>;
     };
   };
 }
