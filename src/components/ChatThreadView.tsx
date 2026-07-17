@@ -93,9 +93,6 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
   }
 
   return (
-    // h-dvh (dynamic viewport height) instead of h-screen — h-screen locks to
-    // the viewport size at page load and doesn't shrink when the mobile
-    // keyboard opens, which is what was dragging the header off-screen.
     <div className="flex flex-col" style={{ height: "var(--app-height, 100dvh)" }}>
       <header className="flex shrink-0 items-center gap-2.5 border-b border-black/5 px-3 py-2 dark:border-white/5">
         <button onClick={() => router.back()} aria-label="Back" className="shrink-0">
@@ -116,13 +113,13 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
         )}
       </header>
 
-      <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-3 py-2 no-scrollbar">
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-2.5 no-scrollbar">
         {messages.map((m) => {
           const mine = m.sender_id === userId;
           return (
             <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
               <div
-                className={`max-w-[70%] break-words rounded-2xl px-3 py-1.5 text-[13px] leading-snug ${
+                className={`max-w-[75%] select-none break-words rounded-2xl px-4 py-2.5 text-[15px] leading-snug ${
                   mine ? "bg-brand-gradient text-white" : "bg-black/5 dark:bg-white/10"
                 }`}
               >
