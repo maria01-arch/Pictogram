@@ -65,9 +65,6 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     if (!content || !userId) return;
     setDraft("");
 
-    // Optimistic append — don't rely solely on the realtime channel, which
-    // requires replication to be enabled per-table in Supabase and can
-    // otherwise make a just-sent message seem to "disappear."
     const optimisticId = `optimistic-${Date.now()}`;
     const optimisticMessage: Message = {
       id: optimisticId,
@@ -94,33 +91,36 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
   }
 
   return (
-    <div className="flex h-screen flex-col">
-      <header className="flex items-center gap-3 border-b border-black/5 px-3 py-2.5 dark:border-white/5">
-        <button onClick={() => router.back()} aria-label="Back">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    // h-dvh (dynamic viewport height) instead of h-screen — h-screen locks to
+    // the viewport size at page load and doesn't shrink when the mobile
+    // keyboard opens, which is what was dragging the header off-screen.
+    <div className="flex h-dvh flex-col">
+      <header className="flex shrink-0 items-center gap-2.5 border-b border-black/5 px-3 py-2 dark:border-white/5">
+        <button onClick={() => router.back()} aria-label="Back" className="shrink-0">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
 
         {otherProfile && (
-          <Link href={`/profile/${otherProfile.username}`} className="flex flex-1 items-center gap-2.5">
-            <div className="h-9 w-9 overflow-hidden rounded-full bg-brand-gradient">
+          <Link href={`/profile/${otherProfile.username}`} className="flex flex-1 items-center gap-2 overflow-hidden">
+            <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-brand-gradient">
               {otherProfile.avatar_url && (
                 <img src={otherProfile.avatar_url} alt="" className="h-full w-full object-cover" />
               )}
             </div>
-            <p className="text-sm font-semibold">{otherProfile.username}</p>
+            <p className="truncate text-sm font-semibold">{otherProfile.username}</p>
           </Link>
         )}
       </header>
 
-      <div className="flex-1 space-y-2 overflow-y-auto px-4 py-3 no-scrollbar">
+      <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-3 py-2 no-scrollbar">
         {messages.map((m) => {
           const mine = m.sender_id === userId;
           return (
             <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
               <div
-                className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
+                className={`max-w-[70%] break-words rounded-2xl px-3 py-1.5 text-[13px] leading-snug ${
                   mine ? "bg-brand-gradient text-white" : "bg-black/5 dark:bg-white/10"
                 }`}
               >
@@ -132,21 +132,21 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
         <div ref={bottomRef} />
       </div>
 
-      <div className="flex items-center gap-2 border-t border-black/5 px-3 py-2 dark:border-white/5">
+      <div className="flex shrink-0 items-center gap-2 border-t border-black/5 px-2.5 py-2 dark:border-white/5">
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && sendMessage()}
           placeholder="Message…"
-          className="flex-1 rounded-full bg-black/5 px-4 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-from dark:bg-white/10"
+          className="flex-1 rounded-full bg-black/5 px-3.5 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-from dark:bg-white/10"
         />
         <button
           onClick={sendMessage}
           disabled={!draft.trim()}
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-gradient text-white disabled:opacity-40"
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-gradient text-white disabled:opacity-40"
           aria-label="Send message"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
             <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
           </svg>
         </button>
