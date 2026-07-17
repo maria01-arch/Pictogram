@@ -18,7 +18,7 @@ export default function CommentsSheet({ postId, onClose }: { postId: string; onC
   async function load() {
     const { data } = await supabase
       .from("comments")
-      .select("*, profiles(username, avatar_url)")
+      .select("*, profiles!comments_user_id_fkey(username, avatar_url)")
       .eq("post_id", postId)
       .order("created_at", { ascending: true });
     setComments(data ?? []);

@@ -20,7 +20,7 @@ export default function StoriesBar() {
     async function load() {
       const { data } = await supabase
         .from("stories")
-        .select("*, profiles(username, avatar_url)")
+        .select("*, profiles!stories_user_id_fkey(username, avatar_url)")
         .order("created_at", { ascending: true });
 
       const byUser = new Map<string, UserStories>();

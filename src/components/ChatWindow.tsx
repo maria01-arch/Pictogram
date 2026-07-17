@@ -18,7 +18,7 @@ export default function ChatWindow({ conversationId }: { conversationId: string 
     async function loadMessages() {
       const { data, error } = await supabase
         .from("messages")
-        .select("*, profiles(username, avatar_url)")
+        .select("*, profiles!messages_sender_id_fkey(username, avatar_url)")
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: true });
 
