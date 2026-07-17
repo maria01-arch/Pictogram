@@ -12,16 +12,17 @@ export default function HomeFeed() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
+  const [debugError, setDebugError] = useState<string | null>(null);
 
   async function loadPosts(offset = 0) {
     const { data, error } = await supabase
       .from("posts")
-      .select("*, profiles(username, avatar_url)")
+      .select("*, profiles!posts_user_id_fkey(username, avatar_url)")
       .order("created_at", { ascending: false })
       .range(offset, offset + PAGE_SIZE - 1);
 
     if (error) {
-      console.error("Failed to load feed:", error.message);
+      setDebugError(JSON.stringify(error, null, 2));
       setLoading(false);
       return;
     }
@@ -39,9 +40,15 @@ export default function HomeFeed() {
     <div>
       <StoriesBar />
 
+      {debugError && (
+        <pre className="mx-3 mt-3 overflow-x-auto whitespace-pre-wrap rounded-xl2 bg-red-500/10 p-3 text-xs text-red-500">
+          {debugError}
+        </pre>
+      )}
+
       {loading ? (
         <FeedSkeleton />
-      ) : posts.length === 0 ? (
+      ) : posts.length === 0 && !debugError ? (
         <div className="flex flex-col items-center gap-2 px-6 py-24 text-center text-ink-muted">
           <p className="text-lg font-semibold">Nothing here yet</p>
           <p className="text-sm">Follow a few creators or post something to get your feed going.</p>
