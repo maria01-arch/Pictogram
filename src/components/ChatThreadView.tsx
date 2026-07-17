@@ -6,6 +6,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import type { Message, Profile } from "@/types/database";
+import type { RealtimeChannel } from "@supabase/supabase-js";
+
+const TYPING_TIMEOUT_MS = 2500;
 
 export default function ChatThreadView({ conversationId }: { conversationId: string }) {
   useViewportHeight();
@@ -14,10 +17,16 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
+  const [otherTyping, setOtherTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const otherTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    init();
+    let cleanup: (() => void) | undefined;
+    init().then((fn) => { cleanup = fn; });
+    return () => cleanup?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
@@ -42,7 +51,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     setMessages(msgs ?? []);
 
     const channel = supabase
-      .channel(`messages:${conversationId}`)
+      .channel(`conversation:${conversationId}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
@@ -51,16 +60,40 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
           setMessages((prev) => (prev.some((m) => m.id === incoming.id) ? prev : [...prev, incoming]));
         }
       )
+      .on("broadcast", { event: "typing" }, (payload) => {
+        if (payload.payload.userId === user.id) return; // ignore our own broadcast
+        setOtherTyping(true);
+        if (otherTypingTimeoutRef.current) clearTimeout(otherTypingTimeoutRef.current);
+        otherTypingTimeoutRef.current = setTimeout(() => setOtherTyping(false), TYPING_TIMEOUT_MS);
+      })
       .subscribe();
+
+    channelRef.current = channel;
 
     return () => {
       supabase.removeChannel(channel);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      if (otherTypingTimeoutRef.current) clearTimeout(otherTypingTimeoutRef.current);
     };
   }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
+
+  function handleDraftChange(value: string) {
+    setDraft(value);
+    if (!userId || !channelRef.current) return;
+
+    channelRef.current.send({
+      type: "broadcast",
+      event: "typing",
+      payload: { userId },
+    });
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {}, TYPING_TIMEOUT_MS);
+  }
 
   async function sendMessage() {
     const content = draft.trim();
@@ -108,7 +141,10 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
                 <img src={otherProfile.avatar_url} alt="" className="h-full w-full object-cover" />
               )}
             </div>
-            <p className="truncate text-sm font-semibold">{otherProfile.username}</p>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{otherProfile.username}</p>
+              {otherTyping && <p className="text-[11px] text-brand-from">typing…</p>}
+            </div>
           </Link>
         )}
       </header>
@@ -134,7 +170,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
       <div className="flex shrink-0 items-center gap-2 border-t border-black/5 px-2.5 py-2 dark:border-white/5">
         <input
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => handleDraftChange(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && sendMessage()}
           placeholder="Message…"
           className="flex-1 rounded-full bg-black/5 px-3.5 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-from dark:bg-white/10"

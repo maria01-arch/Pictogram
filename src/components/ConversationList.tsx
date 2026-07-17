@@ -11,6 +11,7 @@ interface ConversationSummary {
   other_username: string | null;
   other_avatar: string | null;
   last_message: string | null;
+  last_message_at: string | null;
 }
 
 export default function ConversationList() {
@@ -68,8 +69,17 @@ export default function ConversationList() {
         other_username: other?.username ?? null,
         other_avatar: other?.avatar_url ?? null,
         last_message: messages[0]?.content ?? null,
+        last_message_at: messages[0]?.created_at ?? null,
       });
     }
+
+    // Newest activity first — conversations with no messages yet sink to the bottom.
+    summaries.sort((a, b) => {
+      if (!a.last_message_at && !b.last_message_at) return 0;
+      if (!a.last_message_at) return 1;
+      if (!b.last_message_at) return -1;
+      return new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime();
+    });
 
     setConversations(summaries);
     setLoading(false);
