@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useViewportHeight } from "@/lib/useViewportHeight";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import type { Message, Profile } from "@/types/database";
 
 export default function ChatThreadView({ conversationId }: { conversationId: string }) {
+  useViewportHeight();
   const router = useRouter();
   const [otherProfile, setOtherProfile] = useState<Profile | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -94,7 +96,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     // h-dvh (dynamic viewport height) instead of h-screen — h-screen locks to
     // the viewport size at page load and doesn't shrink when the mobile
     // keyboard opens, which is what was dragging the header off-screen.
-    <div className="flex h-dvh flex-col">
+    <div className="flex flex-col" style={{ height: "var(--app-height, 100dvh)" }}>
       <header className="flex shrink-0 items-center gap-2.5 border-b border-black/5 px-3 py-2 dark:border-white/5">
         <button onClick={() => router.back()} aria-label="Back" className="shrink-0">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
