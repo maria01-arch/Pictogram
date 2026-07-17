@@ -29,11 +29,20 @@ export async function getOrCreateDirectConversation(otherUserId: string): Promis
     .single();
   if (convoError || !convo) throw convoError ?? new Error("Failed to create conversation");
 
-  const { error: participantsError } = await supabase.from("conversation_participants").insert([
-    { conversation_id: convo.id, user_id: user.id },
-    { conversation_id: convo.id, user_id: otherUserId },
-  ]);
-  if (participantsError) throw participantsError;
+  // Two SEPARATE inserts, not a batch array. A multi-row insert evaluates
+  // RLS WITH CHECK for every row against the same pre-statement snapshot,
+  // so the second row's "am I already a participant" check can't see the
+  // first row from the same statement. Inserting sequentially means the
+  // first insert is committed before the second one's policy is evaluated.
+  const { error: selfError } = await supabase
+    .from("conversation_participants")
+    .insert({ conversation_id: convo.id, user_id: user.id });
+  if (selfError) throw selfError;
+
+  const { error: otherError } = await supabase
+    .from("conversation_participants")
+    .insert({ conversation_id: convo.id, user_id: otherUserId });
+  if (otherError) throw otherError;
 
   return convo.id;
 }
