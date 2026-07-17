@@ -14,8 +14,9 @@ const NAV_ITEMS = [
 export default function AppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAuthPage = pathname?.startsWith("/auth");
+  const isChatThread = pathname?.startsWith("/chat/");
 
-  if (isAuthPage) {
+  if (isAuthPage || isChatThread) {
     // Auth pages are a standalone experience — no app chrome around them.
     return <>{children}</>;
   }

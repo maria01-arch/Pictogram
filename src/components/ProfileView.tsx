@@ -67,7 +67,7 @@ export default function ProfileView({ username }: { username: string }) {
     setError(null);
     try {
       const conversationId = await getOrCreateDirectConversation(profile.id);
-      router.push(`/chat?conversation=${conversationId}`);
+      router.push(`/chat/${conversationId}`);
     } catch (err) {
       setError(getErrorMessage(err));
     }
