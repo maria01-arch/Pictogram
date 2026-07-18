@@ -29,7 +29,7 @@ export interface Post {
   width: number | null;
   height: number | null;
   created_at: string;
-  profiles?: Pick<Profile, "username" | "avatar_url">;
+  profiles?: Pick<Profile, "username" | "avatar_url" | "is_verified">;
 }
 
 export interface Story {
@@ -72,7 +72,7 @@ export interface Message {
   reply_to_id: string | null;
   edited_at: string | null;
   created_at: string;
-  profiles?: Pick<Profile, "username" | "avatar_url">;
+  profiles?: Pick<Profile, "username" | "avatar_url" | "is_verified">;
 }
 
 type TableDef<Row> = {
@@ -123,7 +123,7 @@ export interface Comment {
   user_id: string;
   content: string;
   created_at: string;
-  profiles?: Pick<Profile, "username" | "avatar_url">;
+  profiles?: Pick<Profile, "username" | "avatar_url" | "is_verified">;
 }
 
 export interface Follow {
