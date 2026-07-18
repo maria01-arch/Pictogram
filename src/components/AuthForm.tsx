@@ -22,10 +22,17 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
 
     try {
       if (mode === "signup") {
+        const trimmedUsername = username.trim();
+        if (!/^[a-zA-Z0-9._]{3,20}$/.test(trimmedUsername)) {
+          setError("Username must be 3-20 characters: letters, numbers, periods, or underscores only (no spaces).");
+          setBusy(false);
+          return;
+        }
+
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { username } },
+          options: { data: { username: trimmedUsername } },
         });
         if (error) throw error;
         setNotice("Check your email to confirm your account, then log in.");
