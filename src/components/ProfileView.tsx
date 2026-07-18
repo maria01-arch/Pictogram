@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getFollowRelation, toggleFollow, type FollowRelation } from "@/lib/follow";
 import { getOrCreateDirectConversation } from "@/lib/conversations";
+import { getBlockStatus, blockUser, unblockUser } from "@/lib/block";
 import { getErrorMessage } from "@/lib/errorMessage";
-import type { Profile, Post, Story } from "@/types/database";
+import type { Profile, Post } from "@/types/database";
 
 export default function ProfileView({ username }: { username: string }) {
   const router = useRouter();
@@ -15,11 +16,14 @@ export default function ProfileView({ username }: { username: string }) {
   const [hasActiveStory, setHasActiveStory] = useState(false);
   const [relation, setRelation] = useState<FollowRelation>("none");
   const [isSelf, setIsSelf] = useState(false);
+  const [blocked, setBlocked] = useState({ blockedByMe: false, blockedMe: false });
   const [loading, setLoading] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [username]);
 
   async function load() {
@@ -46,6 +50,7 @@ export default function ProfileView({ username }: { username: string }) {
 
     if (user && user.id !== p.id) {
       setRelation(await getFollowRelation(p.id));
+      setBlocked(await getBlockStatus(p.id));
     }
     setLoading(false);
   }
@@ -73,12 +78,58 @@ export default function ProfileView({ username }: { username: string }) {
     }
   }
 
+  async function handleBlock() {
+    if (!profile) return;
+    setMenuOpen(false);
+    if (!confirm(`Block ${profile.username}? They won't be able to message or follow you.`)) return;
+    try {
+      await blockUser(profile.id);
+      setBlocked((b) => ({ ...b, blockedByMe: true }));
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  }
+
+  async function handleUnblock() {
+    if (!profile) return;
+    setMenuOpen(false);
+    try {
+      await unblockUser(profile.id);
+      setBlocked((b) => ({ ...b, blockedByMe: false }));
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  }
+
   if (loading) return <p className="px-4 py-16 text-center text-sm text-ink-muted">Loading…</p>;
   if (!profile) return <p className="px-4 py-16 text-center text-sm text-ink-muted">Profile not found.</p>;
 
   return (
     <div className="pb-8">
       <div className="flex flex-col items-center px-4 pt-6">
+        {!isSelf && (
+          <div className="relative mb-2 ml-auto mr-0 self-end">
+            <button onClick={() => setMenuOpen((o) => !o)} className="p-1 text-ink-muted" aria-label="Profile options">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" />
+              </svg>
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 top-7 z-10 w-40 overflow-hidden rounded-xl2 glass-card shadow-lg">
+                {blocked.blockedByMe ? (
+                  <button onClick={handleUnblock} className="w-full px-3 py-2.5 text-left text-sm font-medium">
+                    Unblock
+                  </button>
+                ) : (
+                  <button onClick={handleBlock} className="w-full px-3 py-2.5 text-left text-sm font-medium text-red-500">
+                    Block
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className={hasActiveStory ? "rounded-full bg-brand-gradient p-0.5" : ""}>
           <div className="h-24 w-24 overflow-hidden rounded-full border-2 border-surface-lightMuted bg-brand-gradient dark:border-surface-darkMuted">
             {profile.avatar_url && <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />}
@@ -88,11 +139,13 @@ export default function ProfileView({ username }: { username: string }) {
         <h2 className="mt-3 text-lg font-bold">{profile.display_name ?? profile.username}</h2>
         <p className="text-sm text-ink-muted">@{profile.username}</p>
         {profile.bio && <p className="mt-2 max-w-xs text-center text-sm">{profile.bio}</p>}
-        {profile.location && (
-          <p className="mt-1 text-xs text-ink-muted">📍 {profile.location}</p>
+        {profile.location && <p className="mt-1 text-xs text-ink-muted">📍 {profile.location}</p>}
+
+        {!isSelf && blocked.blockedMe && (
+          <p className="mt-4 text-sm text-ink-muted">This profile isn't available.</p>
         )}
 
-        {!isSelf && (
+        {!isSelf && !blocked.blockedMe && !blocked.blockedByMe && (
           <div className="mt-4 flex gap-2">
             <button
               onClick={handleFollow}
@@ -107,23 +160,26 @@ export default function ProfileView({ username }: { username: string }) {
             </button>
           </div>
         )}
+
+        {!isSelf && blocked.blockedByMe && (
+          <p className="mt-4 text-sm text-ink-muted">You've blocked this user.</p>
+        )}
+
         {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
       </div>
 
-      <div className="mt-6 grid grid-cols-3 gap-0.5 px-0.5">
-        {posts.map((post) => (
-          <div key={post.id} className="aspect-square overflow-hidden bg-black/5 dark:bg-white/5">
-            <img
-              src={post.thumbnail_url ?? post.media_url}
-              alt=""
-              className="h-full w-full object-cover"
-            />
+      {!blocked.blockedMe && (
+        <>
+          <div className="mt-6 grid grid-cols-3 gap-0.5 px-0.5">
+            {posts.map((post) => (
+              <div key={post.id} className="aspect-square overflow-hidden bg-black/5 dark:bg-white/5">
+                <img src={post.thumbnail_url ?? post.media_url} alt="" className="h-full w-full object-cover" />
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      {posts.length === 0 && (
-        <p className="mt-10 text-center text-sm text-ink-muted">No posts yet.</p>
+          {posts.length === 0 && <p className="mt-10 text-center text-sm text-ink-muted">No posts yet.</p>}
+        </>
       )}
     </div>
   );
