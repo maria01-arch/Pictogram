@@ -68,6 +68,8 @@ export interface Message {
   sender_id: string;
   content: string | null;
   media_url: string | null;
+  reply_to_id: string | null;
+  edited_at: string | null;
   created_at: string;
   profiles?: Pick<Profile, "username" | "avatar_url">;
 }
@@ -129,4 +131,17 @@ export interface Follow {
   status: FollowStatus;
   created_at: string;
   profiles?: Profile; // joined profile of whichever side the query selected
+}
+
+export interface MessageReaction {
+  message_id: string;
+  user_id: string;
+  emoji: string;
+  created_at: string;
+}
+
+export interface BlockedUser {
+  blocker_id: string;
+  blocked_id: string;
+  created_at: string;
 }
