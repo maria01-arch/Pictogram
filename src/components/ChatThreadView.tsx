@@ -105,6 +105,8 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
       id: optimisticId,
       conversation_id: conversationId,
       sender_id: userId,
+      reply_to_id: null,
+      edited_at: null,
       content,
       media_url: null,
       created_at: new Date().toISOString(),
@@ -114,6 +116,8 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     const { data, error } = await supabase
       .from("messages")
       .insert({ conversation_id: conversationId, sender_id: userId, content })
+      reply_to_id: null,
+      edited_at: null,
       .select("*")
       .single();
 
