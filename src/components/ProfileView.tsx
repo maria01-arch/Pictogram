@@ -7,9 +7,11 @@ import { getFollowRelation, toggleFollow, type FollowRelation } from "@/lib/foll
 import { getOrCreateDirectConversation } from "@/lib/conversations";
 import { getBlockStatus, blockUser, unblockUser } from "@/lib/block";
 import { getErrorMessage } from "@/lib/errorMessage";
+import VerifiedBadge from "./VerifiedBadge";
 import type { Profile, Post } from "@/types/database";
 
-export default function ProfileView({ username }: { username: string }) {
+export default function ProfileView({ username: rawUsername }: { username: string }) {
+  const username = rawUsername.trim();
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -136,7 +138,7 @@ export default function ProfileView({ username }: { username: string }) {
           </div>
         </div>
 
-        <h2 className="mt-3 text-lg font-bold">{profile.display_name ?? profile.username}</h2>
+        <h2 className="mt-3 flex items-center gap-1.5 text-lg font-bold">{profile.display_name ?? profile.username}{profile.is_verified && <VerifiedBadge size={16} />}</h2>
         <p className="text-sm text-ink-muted">@{profile.username}</p>
         {profile.bio && <p className="mt-2 max-w-xs text-center text-sm">{profile.bio}</p>}
         {profile.location && <p className="mt-1 text-xs text-ink-muted">📍 {profile.location}</p>}

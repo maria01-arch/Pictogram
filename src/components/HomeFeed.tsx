@@ -17,7 +17,7 @@ export default function HomeFeed() {
   async function loadPosts(offset = 0) {
     const { data, error } = await supabase
       .from("posts")
-      .select("*, profiles!posts_user_id_fkey(username, avatar_url)")
+      .select("*, profiles!posts_user_id_fkey(username, avatar_url, is_verified)")
       .order("created_at", { ascending: false })
       .range(offset, offset + PAGE_SIZE - 1);
 

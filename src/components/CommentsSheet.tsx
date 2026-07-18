@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { getErrorMessage } from "@/lib/errorMessage";
+import VerifiedBadge from "./VerifiedBadge";
 import type { Comment } from "@/types/database";
 
 export default function CommentsSheet({ postId, onClose }: { postId: string; onClose: () => void }) {
@@ -20,7 +21,7 @@ export default function CommentsSheet({ postId, onClose }: { postId: string; onC
   async function load() {
     const { data } = await supabase
       .from("comments")
-      .select("*, profiles!comments_user_id_fkey(username, avatar_url)")
+      .select("*, profiles!comments_user_id_fkey(username, avatar_url, is_verified)")
       .eq("post_id", postId)
       .order("created_at", { ascending: true });
     setComments(data ?? []);
@@ -70,7 +71,7 @@ export default function CommentsSheet({ postId, onClose }: { postId: string; onC
                 {c.profiles?.avatar_url && <img src={c.profiles.avatar_url} alt="" className="h-full w-full object-cover" />}
               </div>
               <p className="flex-1 text-sm">
-                <span className="mr-1.5 font-semibold">{c.profiles?.username}</span>
+                <span className="mr-1.5 inline-flex items-center gap-1 font-semibold">{c.profiles?.username}{(c.profiles as any)?.is_verified && <VerifiedBadge size={12} />}</span>
                 {c.content}
               </p>
               {c.user_id === userId && (

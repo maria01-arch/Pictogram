@@ -13,6 +13,7 @@ export interface Profile {
   is_business: boolean;
   location: string | null;
   requires_follow_approval: boolean;
+  is_verified: boolean;
   created_at: string;
   updated_at: string;
 }

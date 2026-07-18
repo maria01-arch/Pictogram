@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import type { Post } from "@/types/database";
 import TapToPlayVideo from "./TapToPlayVideo";
 import PostActions from "./PostActions";
+import VerifiedBadge from "./VerifiedBadge";
 
 const CAPTION_LIMIT = 80;
 
@@ -58,7 +59,7 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
               <img src={post.profiles.avatar_url} alt="" className="h-full w-full object-cover" />
             )}
           </div>
-          <p className="truncate text-sm font-semibold">{username ?? "unknown"}</p>
+          <p className="flex items-center gap-1 truncate text-sm font-semibold">{username ?? "unknown"}{post.profiles?.is_verified && <VerifiedBadge />}</p>
         </Link>
         <span className="shrink-0 text-xs text-ink-muted">{timeAgo(post.created_at)}</span>
 

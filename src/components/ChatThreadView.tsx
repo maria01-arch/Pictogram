@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getBlockStatus } from "@/lib/block";
+import VerifiedBadge from "./VerifiedBadge";
 import type { Message, MessageReaction, Profile } from "@/types/database";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
@@ -250,7 +251,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
               {otherProfile.avatar_url && <img src={otherProfile.avatar_url} alt="" className="h-full w-full object-cover" />}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{otherProfile.username}</p>
+              <p className="flex items-center gap-1 truncate text-sm font-semibold">{otherProfile.username}{(otherProfile as any).is_verified && <VerifiedBadge size={12} />}</p>
               {otherTyping && <p className="text-[11px] text-brand-from">typing…</p>}
             </div>
           </Link>
