@@ -7,6 +7,7 @@ import type { Post } from "@/types/database";
 import TapToPlayVideo from "./TapToPlayVideo";
 import PostActions from "./PostActions";
 import VerifiedBadge from "./VerifiedBadge";
+import HashtagText from "./HashtagText";
 
 const CAPTION_LIMIT = 80;
 
@@ -85,15 +86,21 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
         )}
       </div>
 
-      {post.media_type === "video" ? (
+      {post.media_type === "text" ? (
+        <div className="flex min-h-[200px] items-center bg-brand-gradient px-6 py-8">
+          <p className="text-lg font-medium leading-relaxed text-white">
+            <HashtagText text={post.text_content ?? ""} />
+          </p>
+        </div>
+      ) : post.media_type === "video" ? (
         <TapToPlayVideo
-          videoUrl={post.media_url}
+          videoUrl={post.media_url!}
           thumbnailUrl={post.thumbnail_url}
           aspectRatio={post.width && post.height ? post.width / post.height : 4 / 5}
         />
       ) : (
         <img
-          src={post.media_url}
+          src={post.media_url!}
           alt={post.caption ?? ""}
           loading="lazy"
           className="w-full object-cover"
@@ -106,7 +113,7 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
       {caption && (
         <p className="px-4 pb-3 text-sm leading-snug">
           <span className="mr-1.5 font-semibold">{username}</span>
-          {displayCaption}
+          <HashtagText text={displayCaption} />
           {isLong && (
             <button onClick={() => setExpanded((e) => !e)} className="ml-1 font-medium text-ink-muted">
               {expanded ? "less" : "more"}

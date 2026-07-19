@@ -70,10 +70,10 @@ export default function CommentsSheet({ postId, onClose }: { postId: string; onC
               <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-brand-gradient">
                 {c.profiles?.avatar_url && <img src={c.profiles.avatar_url} alt="" className="h-full w-full object-cover" />}
               </div>
-              <p className="flex-1 text-sm">
+              <div className="flex-1 rounded-2xl bg-black/5 px-3 py-2 text-sm dark:bg-white/10">
                 <span className="mr-1.5 inline-flex items-center gap-1 font-semibold">{c.profiles?.username}{(c.profiles as any)?.is_verified && <VerifiedBadge size={12} />}</span>
                 {c.content}
-              </p>
+              </div>
               {c.user_id === userId && (
                 <button onClick={() => remove(c.id)} className="shrink-0 text-xs text-red-500">
                   Delete
