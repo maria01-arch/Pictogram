@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getBlockStatus } from "@/lib/block";
+import { uploadChatImage } from "@/lib/uploadChatImage";
 import VerifiedBadge from "./VerifiedBadge";
 import type { Message, MessageReaction, Profile } from "@/types/database";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -22,6 +23,7 @@ interface MenuState {
 export default function ChatThreadView({ conversationId }: { conversationId: string }) {
   useViewportHeight();
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [otherProfile, setOtherProfile] = useState<Profile | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [reactions, setReactions] = useState<MessageReaction[]>([]);
@@ -32,6 +34,9 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [blocked, setBlocked] = useState({ blockedByMe: false, blockedMe: false });
+  const [attachMenuOpen, setAttachMenuOpen] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -174,6 +179,28 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     setMessages((prev) => prev.map((m) => (m.id === optimisticId ? data : m)));
   }
 
+  async function handleImageSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    setAttachMenuOpen(false);
+    if (!file || !userId) return;
+
+    setUploadingImage(true);
+    try {
+      const mediaUrl = await uploadChatImage(file);
+      await supabase.from("messages").insert({
+        conversation_id: conversationId,
+        sender_id: userId,
+        content: null,
+        media_url: mediaUrl,
+      });
+    } catch {
+      alert("Failed to send image. Try again.");
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
   function startLongPress(message: Message, x: number, y: number) {
     longPressTimerRef.current = setTimeout(() => setMenu({ message, x, y }), 450);
   }
@@ -200,20 +227,17 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     if (message.content) navigator.clipboard.writeText(message.content);
     setMenu(null);
   }
-
   function handleReply(message: Message) {
     setReplyingTo(message);
     setEditingMessage(null);
     setMenu(null);
   }
-
   function handleEdit(message: Message) {
     setEditingMessage(message);
     setReplyingTo(null);
     setDraft(message.content ?? "");
     setMenu(null);
   }
-
   async function handleDelete(message: Message) {
     setMenu(null);
     if (!confirm("Delete this message?")) return;
@@ -228,7 +252,6 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     });
     return grouped;
   }
-
   function quotedContent(replyToId: string | null) {
     if (!replyToId) return null;
     return messages.find((m) => m.id === replyToId)?.content ?? null;
@@ -251,7 +274,10 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
               {otherProfile.avatar_url && <img src={otherProfile.avatar_url} alt="" className="h-full w-full object-cover" />}
             </div>
             <div className="min-w-0">
-              <p className="flex items-center gap-1 truncate text-sm font-semibold">{otherProfile.username}{(otherProfile as any).is_verified && <VerifiedBadge size={12} />}</p>
+              <p className="flex items-center gap-1 truncate text-sm font-semibold">
+                {otherProfile.username}
+                {otherProfile.is_verified && <VerifiedBadge size={12} />}
+              </p>
               {otherTyping && <p className="text-[11px] text-brand-from">typing…</p>}
             </div>
           </Link>
@@ -266,23 +292,36 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
 
           return (
             <div key={m.id} className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
-              <div
-                onTouchStart={(e) => startLongPress(m, e.touches[0].clientX, e.touches[0].clientY)}
-                onTouchEnd={cancelLongPress}
-                onTouchMove={cancelLongPress}
-                onContextMenu={(e) => { e.preventDefault(); setMenu({ message: m, x: e.clientX, y: e.clientY }); }}
-                className={`max-w-[75%] select-none break-words rounded-2xl px-4 py-2.5 text-[15px] leading-snug ${
-                  mine ? "bg-brand-gradient text-white" : "bg-black/5 dark:bg-white/10"
-                }`}
-              >
-                {quote && (
-                  <p className={`mb-1 truncate border-l-2 pl-2 text-xs opacity-75 ${mine ? "border-white/60" : "border-black/20 dark:border-white/30"}`}>
-                    {quote}
-                  </p>
-                )}
-                {m.content}
-                {m.edited_at && <span className="ml-1.5 text-[10px] opacity-60">(edited)</span>}
-              </div>
+              {m.media_url ? (
+                <button
+                  onClick={() => setLightboxUrl(m.media_url!)}
+                  onTouchStart={(e) => startLongPress(m, e.touches[0].clientX, e.touches[0].clientY)}
+                  onTouchEnd={cancelLongPress}
+                  onTouchMove={cancelLongPress}
+                  onContextMenu={(e) => { e.preventDefault(); setMenu({ message: m, x: e.clientX, y: e.clientY }); }}
+                  className="max-w-[65%] overflow-hidden rounded-2xl border border-black/10 dark:border-white/15"
+                >
+                  <img src={m.media_url} alt="" className="max-h-64 w-full object-cover" />
+                </button>
+              ) : (
+                <div
+                  onTouchStart={(e) => startLongPress(m, e.touches[0].clientX, e.touches[0].clientY)}
+                  onTouchEnd={cancelLongPress}
+                  onTouchMove={cancelLongPress}
+                  onContextMenu={(e) => { e.preventDefault(); setMenu({ message: m, x: e.clientX, y: e.clientY }); }}
+                  className={`max-w-[75%] select-none break-words rounded-2xl px-4 py-2.5 text-[15px] leading-snug ${
+                    mine ? "bg-brand-gradient text-white" : "bg-black/5 dark:bg-white/10"
+                  }`}
+                >
+                  {quote && (
+                    <p className={`mb-1 truncate border-l-2 pl-2 text-xs opacity-75 ${mine ? "border-white/60" : "border-black/20 dark:border-white/30"}`}>
+                      {quote}
+                    </p>
+                  )}
+                  {m.content}
+                  {m.edited_at && <span className="ml-1.5 text-[10px] opacity-60">(edited)</span>}
+                </div>
+              )}
 
               {Object.keys(grouped).length > 0 && (
                 <div className="mt-0.5 flex gap-1">
@@ -313,13 +352,45 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
           <button onClick={() => { setEditingMessage(null); setDraft(""); }} className="text-ink-muted">✕</button>
         </div>
       )}
+      {uploadingImage && (
+        <div className="border-t border-black/5 px-3 py-1.5 text-xs text-ink-muted dark:border-white/5">Sending image…</div>
+      )}
 
       {!canMessage ? (
         <div className="shrink-0 border-t border-black/5 px-3 py-3 text-center text-sm text-ink-muted dark:border-white/5">
           {blocked.blockedByMe ? "You've blocked this user." : "You can't message this user."}
         </div>
       ) : (
-        <div className="flex shrink-0 items-center gap-2 border-t border-black/5 px-2.5 py-2 dark:border-white/5">
+        <div className="relative flex shrink-0 items-center gap-2 border-t border-black/5 px-2.5 py-2 dark:border-white/5">
+          <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelected} className="hidden" />
+
+          <button
+            onClick={() => setAttachMenuOpen((o) => !o)}
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-black/5 text-ink-muted dark:bg-white/10"
+            aria-label="Attach"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+            </svg>
+          </button>
+
+          {attachMenuOpen && (
+            <div className="absolute bottom-12 left-2 z-20 w-44 overflow-hidden rounded-xl2 glass-card shadow-lg">
+              <button
+                onClick={() => { setAttachMenuOpen(false); fileInputRef.current?.click(); }}
+                className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-sm"
+              >
+                🖼️ Image
+              </button>
+              <button
+                onClick={() => { setAttachMenuOpen(false); alert("Voice notes are coming soon."); }}
+                className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-sm"
+              >
+                🎤 Voice note
+              </button>
+            </div>
+          )}
+
           <input
             value={draft}
             onChange={(e) => handleDraftChange(e.target.value)}
@@ -354,15 +425,28 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
                 </button>
               ))}
             </div>
-            <button onClick={() => handleReply(menu.message)} className="w-full px-4 py-2.5 text-left text-sm">Reply</button>
-            <button onClick={() => handleCopy(menu.message)} className="w-full px-4 py-2.5 text-left text-sm">Copy</button>
+            {menu.message.content && (
+              <>
+                <button onClick={() => handleReply(menu.message)} className="w-full px-4 py-2.5 text-left text-sm">Reply</button>
+                <button onClick={() => handleCopy(menu.message)} className="w-full px-4 py-2.5 text-left text-sm">Copy</button>
+              </>
+            )}
             {menu.message.sender_id === userId && (
               <>
-                <button onClick={() => handleEdit(menu.message)} className="w-full px-4 py-2.5 text-left text-sm">Edit</button>
+                {menu.message.content && (
+                  <button onClick={() => handleEdit(menu.message)} className="w-full px-4 py-2.5 text-left text-sm">Edit</button>
+                )}
                 <button onClick={() => handleDelete(menu.message)} className="w-full px-4 py-2.5 text-left text-sm text-red-500">Delete</button>
               </>
             )}
           </div>
+        </div>
+      )}
+
+      {lightboxUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90" onClick={() => setLightboxUrl(null)}>
+          <img src={lightboxUrl} alt="" className="max-h-[85vh] max-w-[92vw] object-contain" />
+          <button onClick={() => setLightboxUrl(null)} className="absolute right-4 top-5 text-white">✕</button>
         </div>
       )}
     </div>

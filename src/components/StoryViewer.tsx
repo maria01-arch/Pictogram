@@ -16,7 +16,7 @@ export default function StoryViewer({
   const current = stories[index];
 
   useEffect(() => {
-    const duration = current.media_type === "video" ? 15000 : 5000;
+    const duration = current.media_type === "video" ? 15000 : current.media_type === "text" ? 6000 : 5000;
     const timer = setTimeout(() => {
       if (index < stories.length - 1) setIndex((i) => i + 1);
       else onClose();
@@ -53,10 +53,14 @@ export default function StoryViewer({
         ✕
       </button>
 
-      {current.media_type === "video" ? (
-        <video src={current.media_url} autoPlay playsInline muted className="h-full w-full object-contain" />
+      {current.media_type === "text" ? (
+        <div className="flex h-full w-full items-center justify-center bg-brand-gradient px-8">
+          <p className="text-center text-xl font-semibold leading-relaxed text-white">{current.text_content}</p>
+        </div>
+      ) : current.media_type === "video" ? (
+        <video src={current.media_url ?? undefined} autoPlay playsInline muted className="h-full w-full object-contain" />
       ) : (
-        <img src={current.media_url} alt="" className="h-full w-full object-contain" />
+        <img src={current.media_url ?? undefined} alt="" className="h-full w-full object-contain" />
       )}
     </div>
   );
