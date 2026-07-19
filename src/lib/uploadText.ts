@@ -1,6 +1,6 @@
 import { supabase } from "./supabaseClient";
 
-export const MIN_TEXT_POST_WORDS = 100;
+export const MIN_TEXT_POST_WORDS = 20;
 
 export function wordCount(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;

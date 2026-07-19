@@ -42,6 +42,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
   const channelRef = useRef<RealtimeChannel | null>(null);
   const otherTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFiredRef = useRef(false);
 
   useEffect(() => {
     let cleanup: (() => void) | undefined;
@@ -202,25 +203,46 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
   }
 
   function startLongPress(message: Message, x: number, y: number) {
-    longPressTimerRef.current = setTimeout(() => setMenu({ message, x, y }), 450);
+    longPressFiredRef.current = false;
+    longPressTimerRef.current = setTimeout(() => {
+      longPressFiredRef.current = true;
+      setMenu({ message, x, y });
+    }, 450);
   }
   function cancelLongPress() {
     if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
   }
+  function handleImageTap(mediaUrl: string) {
+    // A long-press still fires a trailing click on release — if the menu
+    // already opened from the long-press, swallow this tap instead of
+    // also opening the lightbox on top of it (that's what caused the freeze).
+    if (longPressFiredRef.current) {
+      longPressFiredRef.current = false;
+      return;
+    }
+    setLightboxUrl(mediaUrl);
+  }
 
   async function toggleReaction(message: Message, emoji: string) {
     if (!userId) return;
-    const existing = reactions.find((r) => r.message_id === message.id && r.user_id === userId && r.emoji === emoji);
+    // One reaction per user per message: tapping the same emoji again
+    // removes it, tapping a different emoji replaces the existing one.
+    const existing = reactions.find((r) => r.message_id === message.id && r.user_id === userId);
     setMenu(null);
 
-    if (existing) {
-      setReactions((prev) => prev.filter((r) => !(r.message_id === message.id && r.user_id === userId && r.emoji === emoji)));
-      await supabase.from("message_reactions").delete().eq("message_id", message.id).eq("user_id", userId).eq("emoji", emoji);
-    } else {
-      const optimistic: MessageReaction = { message_id: message.id, user_id: userId, emoji, created_at: new Date().toISOString() };
-      setReactions((prev) => [...prev, optimistic]);
-      await supabase.from("message_reactions").insert({ message_id: message.id, user_id: userId, emoji });
+    if (existing && existing.emoji === emoji) {
+      setReactions((prev) => prev.filter((r) => !(r.message_id === message.id && r.user_id === userId)));
+      await supabase.from("message_reactions").delete().eq("message_id", message.id).eq("user_id", userId);
+      return;
     }
+
+    setReactions((prev) => [
+      ...prev.filter((r) => !(r.message_id === message.id && r.user_id === userId)),
+      { message_id: message.id, user_id: userId, emoji, created_at: new Date().toISOString() },
+    ]);
+    await supabase
+      .from("message_reactions")
+      .upsert({ message_id: message.id, user_id: userId, emoji }, { onConflict: "message_id,user_id" });
   }
 
   function handleCopy(message: Message) {
@@ -294,14 +316,20 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
             <div key={m.id} className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
               {m.media_url ? (
                 <button
-                  onClick={() => setLightboxUrl(m.media_url!)}
+                  onClick={() => handleImageTap(m.media_url!)}
                   onTouchStart={(e) => startLongPress(m, e.touches[0].clientX, e.touches[0].clientY)}
                   onTouchEnd={cancelLongPress}
                   onTouchMove={cancelLongPress}
                   onContextMenu={(e) => { e.preventDefault(); setMenu({ message: m, x: e.clientX, y: e.clientY }); }}
                   className="max-w-[65%] overflow-hidden rounded-2xl border border-black/10 dark:border-white/15"
                 >
-                  <img src={m.media_url} alt="" className="max-h-64 w-full object-cover" />
+                  <img
+                    src={m.media_url}
+                    alt=""
+                    draggable={false}
+                    className="max-h-64 w-full select-none object-cover"
+                    style={{ WebkitTouchCallout: "none" } as React.CSSProperties}
+                  />
                 </button>
               ) : (
                 <div

@@ -10,8 +10,8 @@ interface ConversationSummary {
   is_group: boolean;
   other_username: string | null;
   other_avatar: string | null;
-  last_message: string | null;
-  last_message_at: string | null;
+  preview: string;
+  activityAt: string | null;
 }
 
 export default function ConversationList() {
@@ -33,7 +33,7 @@ export default function ConversationList() {
         conversation_id,
         conversations (
           id, title, is_group,
-          messages ( content, created_at, sender_id )
+          messages ( id, content, media_url, created_at, sender_id )
         )
       `
       )
@@ -56,11 +56,38 @@ export default function ConversationList() {
         .eq("conversation_id", convo.id)
         .neq("user_id", user.id)
         .limit(1);
-
       const other = (others?.[0] as any)?.profiles;
+
       const messages = (convo.messages ?? []).sort(
         (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
+      const lastMessage = messages[0];
+
+      let latestReaction: any = null;
+      if (messages.length > 0) {
+        const { data: reactionRows } = await supabase
+          .from("message_reactions")
+          .select("emoji, created_at, user_id, message_id, profiles!message_reactions_user_id_fkey(username)")
+          .in("message_id", messages.map((m: any) => m.id))
+          .order("created_at", { ascending: false })
+          .limit(1);
+        latestReaction = reactionRows?.[0] ?? null;
+      }
+
+      let preview = "Say hello 👋";
+      let activityAt: string | null = lastMessage?.created_at ?? null;
+
+      if (lastMessage) {
+        preview = lastMessage.content ?? (lastMessage.media_url ? "📷 Sent a photo" : "Say hello 👋");
+      }
+
+      if (latestReaction && (!lastMessage || new Date(latestReaction.created_at) > new Date(lastMessage.created_at))) {
+        const reactedToOwnMessage = messages.find((m: any) => m.id === latestReaction.message_id)?.sender_id === user.id;
+        preview = reactedToOwnMessage
+          ? `${latestReaction.profiles?.username ?? "Someone"} reacted ${latestReaction.emoji} to your message`
+          : `You reacted ${latestReaction.emoji}`;
+        activityAt = latestReaction.created_at;
+      }
 
       summaries.push({
         id: convo.id,
@@ -68,17 +95,16 @@ export default function ConversationList() {
         is_group: convo.is_group,
         other_username: other?.username ?? null,
         other_avatar: other?.avatar_url ?? null,
-        last_message: messages[0]?.content ?? null,
-        last_message_at: messages[0]?.created_at ?? null,
+        preview,
+        activityAt,
       });
     }
 
-    // Newest activity first — conversations with no messages yet sink to the bottom.
     summaries.sort((a, b) => {
-      if (!a.last_message_at && !b.last_message_at) return 0;
-      if (!a.last_message_at) return 1;
-      if (!b.last_message_at) return -1;
-      return new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime();
+      if (!a.activityAt && !b.activityAt) return 0;
+      if (!a.activityAt) return 1;
+      if (!b.activityAt) return -1;
+      return new Date(b.activityAt).getTime() - new Date(a.activityAt).getTime();
     });
 
     setConversations(summaries);
@@ -108,7 +134,7 @@ export default function ConversationList() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold">{c.title ?? c.other_username ?? "Conversation"}</p>
-              <p className="truncate text-xs text-ink-muted">{c.last_message ?? "Say hello 👋"}</p>
+              <p className="truncate text-xs text-ink-muted">{c.preview}</p>
             </div>
           </Link>
         </li>
