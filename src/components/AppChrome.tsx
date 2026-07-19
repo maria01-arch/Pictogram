@@ -28,7 +28,15 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
           <h1 className="bg-brand-gradient bg-clip-text text-xl font-bold text-transparent">
             pictogram
           </h1>
-          <AuthHeaderControl />
+          <div className="flex items-center gap-1">
+            <Link href="/search" aria-label="Search" className="rounded-full p-2 text-ink-light transition hover:bg-black/5 dark:text-ink-dark dark:hover:bg-white/10">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="7" />
+                <path d="M21 21l-4.35-4.35" strokeLinecap="round" />
+              </svg>
+            </Link>
+            <AuthHeaderControl />
+          </div>
         </div>
       </header>
 
