@@ -35,7 +35,6 @@ export default function DatingView() {
   const [matchedProfile, setMatchedProfile] = useState<DatingCandidate | null>(null);
 
   const [matches, setMatches] = useState<DatingMatchSummary[]>([]);
-  const [debugPresence, setDebugPresence] = useState<string | null>(null);
   const presenceChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
@@ -75,35 +74,23 @@ export default function DatingView() {
     const channel = supabase.channel("presence:dating", { config: { presence: { key: user.id } } });
     presenceChannelRef.current = channel;
 
-    let lastStatus = "unknown";
-    let trackResult: string = "not attempted";
     let latestOnlineIds: string[] = [];
 
-    // presenceState() right after track() is unreliable — track() resolving
-    // only confirms the message reached the server, not that the local
-    // state has synced back yet. The 'sync' event is what actually fires
-    // once the server has broadcast the current presence set to us.
+    // The 'sync' event fires once the server has broadcast the current
+    // presence set back to us — reading presenceState() cold right after
+    // track() can miss that round trip.
     channel.on("presence", { event: "sync" }, () => {
       latestOnlineIds = Object.keys(channel.presenceState());
     });
 
-    channel.subscribe(async (status, err) => {
-      lastStatus = status + (err ? ` (${err.message})` : "");
+    channel.subscribe(async (status) => {
       if (status === "SUBSCRIBED") {
-        try {
-          const res = await channel.track({ online_at: new Date().toISOString() });
-          trackResult = res;
-        } catch (e) {
-          trackResult = "track threw: " + (e instanceof Error ? e.message : String(e));
-        }
+        await channel.track({ online_at: new Date().toISOString() });
       }
     });
 
     setTimeout(async () => {
       const onlineIds = latestOnlineIds;
-      setDebugPresence(
-        `Channel status: ${lastStatus} | Track result: ${trackResult} | Presence keys: [${onlineIds.join(", ") || "none"}] (my id: ${user.id})`
-      );
       try {
         const results = await fetchCandidates(onlineIds);
         setCandidates(results);
@@ -191,7 +178,6 @@ export default function DatingView() {
       </div>
 
       {error && <p className="mb-3 text-sm text-red-500">{error}</p>}
-      {debugPresence && <p className="mb-3 rounded-xl2 bg-black/5 p-2 text-xs text-ink-muted dark:bg-white/10">{debugPresence}</p>}
 
       {tab === "search" && (
         <div>

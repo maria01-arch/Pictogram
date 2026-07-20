@@ -11,30 +11,61 @@ const NAV_ITEMS = [
   { href: "/friends", label: "Friends", icon: "M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m5-5a4 4 0 100-8 4 4 0 000 8zm7 3a4 4 0 00-3-3.87M4 12.13A4 4 0 017 8.26" },
 ];
 
+// Routes that get a plain title + notification icon instead of the
+// logo + search bar (home is the only route that keeps search/logo).
+const TITLED_ROUTES: { prefix: string; title: string }[] = [
+  { prefix: "/chat", title: "Messages" },
+  { prefix: "/friends", title: "Friends" },
+  { prefix: "/create", title: "Create" },
+  { prefix: "/menu", title: "Menu" },
+];
+
+function NotificationIcon() {
+  return (
+    <Link href="/notifications" aria-label="Notifications" className="rounded-full p-2 text-ink-light transition hover:bg-black/5 dark:text-ink-dark dark:hover:bg-white/10">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M13.73 21a2 2 0 01-3.46 0" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </Link>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <Link href="/search" aria-label="Search" className="rounded-full p-2 text-ink-light transition hover:bg-black/5 dark:text-ink-dark dark:hover:bg-white/10">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <circle cx="11" cy="11" r="7" />
+        <path d="M21 21l-4.35-4.35" strokeLinecap="round" />
+      </svg>
+    </Link>
+  );
+}
+
 export default function AppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAuthPage = pathname?.startsWith("/auth");
   const isChatThread = pathname?.startsWith("/chat/");
 
   if (isAuthPage || isChatThread) {
-    // Auth pages are a standalone experience — no app chrome around them.
     return <>{children}</>;
   }
+
+  const titledRoute = TITLED_ROUTES.find((r) => pathname?.startsWith(r.prefix));
 
   return (
     <>
       <header className="sticky top-0 z-30 glass-card">
         <div className="mx-auto flex max-w-lg items-center justify-between px-4 py-3">
-          <h1 className="bg-brand-gradient bg-clip-text text-xl font-bold text-transparent">
-            pictogram
-          </h1>
+          {titledRoute ? (
+            <h1 className="text-xl font-bold text-black dark:text-white">{titledRoute.title}</h1>
+          ) : (
+            <h1 className="bg-brand-gradient bg-clip-text text-xl font-bold text-transparent">
+              pictogram
+            </h1>
+          )}
           <div className="flex items-center gap-1">
-            <Link href="/search" aria-label="Search" className="rounded-full p-2 text-ink-light transition hover:bg-black/5 dark:text-ink-dark dark:hover:bg-white/10">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="11" cy="11" r="7" />
-                <path d="M21 21l-4.35-4.35" strokeLinecap="round" />
-              </svg>
-            </Link>
+            {titledRoute ? <NotificationIcon /> : <SearchIcon />}
             <AuthHeaderControl />
           </div>
         </div>
