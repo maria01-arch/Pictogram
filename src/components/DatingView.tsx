@@ -77,6 +77,15 @@ export default function DatingView() {
 
     let lastStatus = "unknown";
     let trackResult: string = "not attempted";
+    let latestOnlineIds: string[] = [];
+
+    // presenceState() right after track() is unreliable — track() resolving
+    // only confirms the message reached the server, not that the local
+    // state has synced back yet. The 'sync' event is what actually fires
+    // once the server has broadcast the current presence set to us.
+    channel.on("presence", { event: "sync" }, () => {
+      latestOnlineIds = Object.keys(channel.presenceState());
+    });
 
     channel.subscribe(async (status, err) => {
       lastStatus = status + (err ? ` (${err.message})` : "");
@@ -91,8 +100,7 @@ export default function DatingView() {
     });
 
     setTimeout(async () => {
-      const state = channel.presenceState();
-      const onlineIds = Object.keys(state);
+      const onlineIds = latestOnlineIds;
       setDebugPresence(
         `Channel status: ${lastStatus} | Track result: ${trackResult} | Presence keys: [${onlineIds.join(", ") || "none"}] (my id: ${user.id})`
       );
