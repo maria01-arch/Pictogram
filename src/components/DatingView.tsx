@@ -35,6 +35,7 @@ export default function DatingView() {
   const [matchedProfile, setMatchedProfile] = useState<DatingCandidate | null>(null);
 
   const [matches, setMatches] = useState<DatingMatchSummary[]>([]);
+  const [debugPresence, setDebugPresence] = useState<string | null>(null);
   const presenceChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
@@ -83,6 +84,7 @@ export default function DatingView() {
     setTimeout(async () => {
       const state = channel.presenceState();
       const onlineIds = Object.keys(state);
+      setDebugPresence(`Presence keys seen: [${onlineIds.join(", ") || "none"}] (my id: ${user.id})`);
       try {
         const results = await fetchCandidates(onlineIds);
         setCandidates(results);
@@ -170,6 +172,7 @@ export default function DatingView() {
       </div>
 
       {error && <p className="mb-3 text-sm text-red-500">{error}</p>}
+      {debugPresence && <p className="mb-3 rounded-xl2 bg-black/5 p-2 text-xs text-ink-muted dark:bg-white/10">{debugPresence}</p>}
 
       {tab === "search" && (
         <div>
