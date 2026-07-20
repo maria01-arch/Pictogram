@@ -148,3 +148,22 @@ export interface BlockedUser {
   blocked_id: string;
   created_at: string;
 }
+
+export interface DatingProfile {
+  user_id: string;
+  enabled: boolean;
+  bio: string | null;
+  updated_at: string;
+}
+
+export interface DatingLike {
+  liker_id: string;
+  liked_id: string;
+  created_at: string;
+}
+
+export interface DatingMatch {
+  user_a: string;
+  user_b: string;
+  created_at: string;
+}
