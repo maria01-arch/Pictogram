@@ -75,16 +75,27 @@ export default function DatingView() {
     const channel = supabase.channel("presence:dating", { config: { presence: { key: user.id } } });
     presenceChannelRef.current = channel;
 
-    channel.subscribe(async (status) => {
+    let lastStatus = "unknown";
+    let trackResult: string = "not attempted";
+
+    channel.subscribe(async (status, err) => {
+      lastStatus = status + (err ? ` (${err.message})` : "");
       if (status === "SUBSCRIBED") {
-        await channel.track({ online_at: new Date().toISOString() });
+        try {
+          const res = await channel.track({ online_at: new Date().toISOString() });
+          trackResult = res;
+        } catch (e) {
+          trackResult = "track threw: " + (e instanceof Error ? e.message : String(e));
+        }
       }
     });
 
     setTimeout(async () => {
       const state = channel.presenceState();
       const onlineIds = Object.keys(state);
-      setDebugPresence(`Presence keys seen: [${onlineIds.join(", ") || "none"}] (my id: ${user.id})`);
+      setDebugPresence(
+        `Channel status: ${lastStatus} | Track result: ${trackResult} | Presence keys: [${onlineIds.join(", ") || "none"}] (my id: ${user.id})`
+      );
       try {
         const results = await fetchCandidates(onlineIds);
         setCandidates(results);
