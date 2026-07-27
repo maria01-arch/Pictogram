@@ -9,6 +9,7 @@ import { getBlockStatus, blockUser, unblockUser } from "@/lib/block";
 import { getErrorMessage } from "@/lib/errorMessage";
 import VerifiedBadge from "./VerifiedBadge";
 import type { Profile, Post } from "@/types/database";
+import PostCard from "./PostCard";
 
 export default function ProfileView({ username: rawUsername }: { username: string }) {
   const username = rawUsername.trim();
@@ -21,6 +22,7 @@ export default function ProfileView({ username: rawUsername }: { username: strin
   const [blocked, setBlocked] = useState({ blockedByMe: false, blockedMe: false });
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -174,14 +176,41 @@ export default function ProfileView({ username: rawUsername }: { username: strin
         <>
           <div className="mt-6 grid grid-cols-3 gap-0.5 px-0.5">
             {posts.map((post) => (
-              <div key={post.id} className="aspect-square overflow-hidden bg-black/5 dark:bg-white/5">
-                <img src={post.thumbnail_url ?? post.media_url} alt="" className="h-full w-full object-cover" />
-              </div>
+              <button
+                key={post.id}
+                onClick={() => setSelectedPost(post)}
+                className="aspect-square overflow-hidden bg-black/5 dark:bg-white/5"
+              >
+                {post.media_type === "text" ? (
+                  <div className="flex h-full w-full items-center justify-center bg-brand-gradient p-2 text-center text-[10px] text-white">
+                    {post.text_content?.slice(0, 40)}
+                  </div>
+                ) : (
+                  <img src={post.thumbnail_url ?? post.media_url ?? ""} alt="" className="h-full w-full object-cover" />
+                )}
+              </button>
             ))}
           </div>
 
           {posts.length === 0 && <p className="mt-10 text-center text-sm text-ink-muted">No posts yet.</p>}
         </>
+      )}
+
+      {selectedPost && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 px-3 py-8" onClick={() => setSelectedPost(null)}>
+          <div className="mx-auto max-w-lg" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setSelectedPost(null)} className="mb-2 block text-sm font-semibold text-white">
+              ✕ Close
+            </button>
+            <PostCard
+              post={selectedPost}
+              onDeleted={(id) => {
+                setPosts((prev) => prev.filter((p) => p.id !== id));
+                setSelectedPost(null);
+              }}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

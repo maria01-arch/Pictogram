@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { Post } from "@/types/database";
 import PostCard from "./PostCard";
@@ -11,10 +11,11 @@ const PAGE_SIZE = 10;
 export default function HomeFeed() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [debugError, setDebugError] = useState<string | null>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
-  async function loadPosts(offset = 0) {
+  const loadPosts = useCallback(async (offset: number) => {
     const { data, error } = await supabase
       .from("posts")
       .select("*, profiles!posts_user_id_fkey(username, avatar_url, is_verified)")
@@ -22,33 +23,43 @@ export default function HomeFeed() {
       .range(offset, offset + PAGE_SIZE - 1);
 
     if (error) {
-      setDebugError(JSON.stringify(error, null, 2));
-      setLoading(false);
+      console.error("Failed to load feed:", error.message);
       return;
     }
 
     setPosts((prev) => (offset === 0 ? data ?? [] : [...prev, ...(data ?? [])]));
     setHasMore((data?.length ?? 0) === PAGE_SIZE);
-    setLoading(false);
-  }
+  }, []);
 
   useEffect(() => {
-    loadPosts();
-  }, []);
+    loadPosts(0).then(() => setLoading(false));
+  }, [loadPosts]);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || loading) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore) {
+          setLoadingMore(true);
+          loadPosts(posts.length).finally(() => setLoadingMore(false));
+        }
+      },
+      { rootMargin: "400px" } // start loading before the sentinel is actually on-screen
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [loading, hasMore, loadingMore, posts.length, loadPosts]);
 
   return (
     <div>
       <StoriesBar />
 
-      {debugError && (
-        <pre className="mx-3 mt-3 overflow-x-auto whitespace-pre-wrap rounded-xl2 bg-red-500/10 p-3 text-xs text-red-500">
-          {debugError}
-        </pre>
-      )}
-
       {loading ? (
         <FeedSkeleton />
-      ) : posts.length === 0 && !debugError ? (
+      ) : posts.length === 0 ? (
         <div className="flex flex-col items-center gap-2 px-6 py-24 text-center text-ink-muted">
           <p className="text-lg font-semibold">Nothing here yet</p>
           <p className="text-sm">Follow a few creators or post something to get your feed going.</p>
@@ -59,14 +70,9 @@ export default function HomeFeed() {
             <PostCard key={post.id} post={post} onDeleted={(id) => setPosts((prev) => prev.filter((p) => p.id !== id))} />
           ))}
 
-          {hasMore && (
-            <button
-              onClick={() => loadPosts(posts.length)}
-              className="mb-6 w-full rounded-xl2 border border-black/10 py-2.5 text-sm font-medium text-ink-muted transition hover:border-brand-from hover:text-brand-from dark:border-white/10"
-            >
-              Load more
-            </button>
-          )}
+          <div ref={sentinelRef} className="h-4" />
+          {loadingMore && <p className="pb-4 text-center text-xs text-ink-muted">Loading more…</p>}
+          {!hasMore && <p className="pb-6 text-center text-xs text-ink-muted">You're all caught up.</p>}
         </div>
       )}
     </div>

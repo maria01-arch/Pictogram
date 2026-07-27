@@ -14,11 +14,18 @@ interface ConversationSummary {
   activityAt: string | null;
 }
 
+// Module-level cache — survives remounts within the same page session
+// (e.g. leaving and returning to the Chat tab), so the list paints
+// instantly on return instead of showing a loading state every time.
+let cachedConversations: ConversationSummary[] | null = null;
+
 export default function ConversationList() {
-  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [conversations, setConversations] = useState<ConversationSummary[]>(cachedConversations ?? []);
+  const [loading, setLoading] = useState(cachedConversations === null);
 
   useEffect(() => {
+    // Always refresh in the background, even if we painted from cache —
+    // keeps the list current without blocking the initial render.
     load();
   }, []);
 
@@ -107,6 +114,7 @@ export default function ConversationList() {
       return new Date(b.activityAt).getTime() - new Date(a.activityAt).getTime();
     });
 
+    cachedConversations = summaries;
     setConversations(summaries);
     setLoading(false);
   }

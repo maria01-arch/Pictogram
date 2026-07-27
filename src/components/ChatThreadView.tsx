@@ -8,6 +8,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { getBlockStatus } from "@/lib/block";
 import { uploadChatImage } from "@/lib/uploadChatImage";
 import VerifiedBadge from "./VerifiedBadge";
+import EmojiText from "./EmojiText";
+import { isOnlyEmoji } from "@/lib/emoji";
 import type { Message, MessageReaction, Profile } from "@/types/database";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
@@ -331,6 +333,16 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
                     style={{ WebkitTouchCallout: "none" } as React.CSSProperties}
                   />
                 </button>
+              ) : m.content && isOnlyEmoji(m.content) && !quote ? (
+                <div
+                  onTouchStart={(e) => startLongPress(m, e.touches[0].clientX, e.touches[0].clientY)}
+                  onTouchEnd={cancelLongPress}
+                  onTouchMove={cancelLongPress}
+                  onContextMenu={(e) => { e.preventDefault(); setMenu({ message: m, x: e.clientX, y: e.clientY }); }}
+                  className="select-none px-1 py-1"
+                >
+                  <EmojiText text={m.content} size={44} />
+                </div>
               ) : (
                 <div
                   onTouchStart={(e) => startLongPress(m, e.touches[0].clientX, e.touches[0].clientY)}
@@ -346,7 +358,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
                       {quote}
                     </p>
                   )}
-                  {m.content}
+                  {m.content && <EmojiText text={m.content} size={18} />}
                   {m.edited_at && <span className="ml-1.5 text-[10px] opacity-60">(edited)</span>}
                 </div>
               )}
