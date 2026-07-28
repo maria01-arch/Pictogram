@@ -5,10 +5,12 @@ import { supabase } from "@/lib/supabaseClient";
 import type { Post } from "@/types/database";
 import PostCard from "./PostCard";
 import StoriesBar from "./StoriesBar";
+import { useTopLoading } from "./TopLoadingBar";
 
 const PAGE_SIZE = 10;
 
 export default function HomeFeed() {
+  const { start, done } = useTopLoading();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -16,6 +18,7 @@ export default function HomeFeed() {
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const loadPosts = useCallback(async (offset: number) => {
+    start();
     const { data, error } = await supabase
       .from("posts")
       .select("*, profiles!posts_user_id_fkey(username, avatar_url, is_verified)")
@@ -29,7 +32,8 @@ export default function HomeFeed() {
 
     setPosts((prev) => (offset === 0 ? data ?? [] : [...prev, ...(data ?? [])]));
     setHasMore((data?.length ?? 0) === PAGE_SIZE);
-  }, []);
+    done();
+  }, [done, start]);
 
   useEffect(() => {
     loadPosts(0).then(() => setLoading(false));
