@@ -17,37 +17,26 @@ export default function PostActions({ postId }: { postId: string }) {
   }, [postId]);
 
   async function load() {
-    const { data: { user } } = await supabase.auth.getUser();
+    // Fire all independent reads in parallel instead of sequentially —
+    // this was 5 back-to-back round trips per post card, a real source
+    // of feed lag when several cards load at once.
+    const [{ data: { user } }, likesCountRes, commentsCountRes] = await Promise.all([
+      supabase.auth.getUser(),
+      supabase.from("likes").select("*", { count: "exact", head: true }).eq("post_id", postId),
+      supabase.from("comments").select("*", { count: "exact", head: true }).eq("post_id", postId),
+    ]);
+
     setUserId(user?.id ?? null);
-
-    const { count: likes } = await supabase
-      .from("likes")
-      .select("*", { count: "exact", head: true })
-      .eq("post_id", postId);
-    setLikeCount(likes ?? 0);
-
-    const { count: comments } = await supabase
-      .from("comments")
-      .select("*", { count: "exact", head: true })
-      .eq("post_id", postId);
-    setCommentCount(comments ?? 0);
+    setLikeCount(likesCountRes.count ?? 0);
+    setCommentCount(commentsCountRes.count ?? 0);
 
     if (user) {
-      const { data: likeRow } = await supabase
-        .from("likes")
-        .select("post_id")
-        .eq("post_id", postId)
-        .eq("user_id", user.id)
-        .maybeSingle();
-      setLiked(!!likeRow);
-
-      const { data: saveRow } = await supabase
-        .from("saves")
-        .select("post_id")
-        .eq("post_id", postId)
-        .eq("user_id", user.id)
-        .maybeSingle();
-      setSaved(!!saveRow);
+      const [likeRowRes, saveRowRes] = await Promise.all([
+        supabase.from("likes").select("post_id").eq("post_id", postId).eq("user_id", user.id).maybeSingle(),
+        supabase.from("saves").select("post_id").eq("post_id", postId).eq("user_id", user.id).maybeSingle(),
+      ]);
+      setLiked(!!likeRowRes.data);
+      setSaved(!!saveRowRes.data);
     }
   }
 

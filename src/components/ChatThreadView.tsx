@@ -9,6 +9,8 @@ import { getBlockStatus } from "@/lib/block";
 import { uploadChatImage } from "@/lib/uploadChatImage";
 import VerifiedBadge from "./VerifiedBadge";
 import EmojiText from "./EmojiText";
+import { useTopLoading } from "./TopLoadingBar";
+import { ChatSkeleton } from "./Skeleton";
 import { isSingleEmoji } from "@/lib/emoji";
 import type { Message, MessageReaction, Profile } from "@/types/database";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -25,6 +27,8 @@ interface MenuState {
 export default function ChatThreadView({ conversationId }: { conversationId: string }) {
   useViewportHeight();
   const router = useRouter();
+  const { start, done } = useTopLoading();
+  const [initialLoading, setInitialLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [otherProfile, setOtherProfile] = useState<Profile | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -54,14 +58,26 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
   }, [conversationId]);
 
   async function init() {
+    start();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      setInitialLoading(false);
+      done();
+      return;
+    }
     setUserId(user.id);
 
-    const { data: participants } = await supabase
-      .from("conversation_participants")
-      .select("user_id, profiles!conversation_participants_user_id_fkey(*)")
-      .eq("conversation_id", conversationId);
+    const [{ data: participants }, { data: msgs }] = await Promise.all([
+      supabase
+        .from("conversation_participants")
+        .select("user_id, profiles!conversation_participants_user_id_fkey(*)")
+        .eq("conversation_id", conversationId),
+      supabase
+        .from("messages")
+        .select("*")
+        .eq("conversation_id", conversationId)
+        .order("created_at", { ascending: true }),
+    ]);
 
     const other = (participants ?? []).find((p: any) => p.user_id !== user.id);
     if (other) {
@@ -70,11 +86,6 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
       getBlockStatus(profile.id).then(setBlocked);
     }
 
-    const { data: msgs } = await supabase
-      .from("messages")
-      .select("*")
-      .eq("conversation_id", conversationId)
-      .order("created_at", { ascending: true });
     setMessages(msgs ?? []);
 
     if (msgs && msgs.length > 0) {
@@ -84,6 +95,9 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
         .in("message_id", msgs.map((m) => m.id));
       setReactions(reacts ?? []);
     }
+
+    setInitialLoading(false);
+    done();
 
     const channel = supabase
       .channel(`conversation:${conversationId}`)
@@ -308,6 +322,9 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
         )}
       </header>
 
+      {initialLoading ? (
+        <ChatSkeleton />
+      ) : (
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-2.5 no-scrollbar">
         {messages.length === 0 && otherProfile && (
           <div className="flex flex-col items-center gap-2 py-16 text-center">
@@ -391,6 +408,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
         })}
         <div ref={bottomRef} />
       </div>
+      )}
 
       {replyingTo && (
         <div className="flex items-center gap-2 border-t border-black/5 px-3 py-1.5 dark:border-white/5">

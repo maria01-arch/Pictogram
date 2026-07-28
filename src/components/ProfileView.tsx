@@ -10,10 +10,13 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import VerifiedBadge from "./VerifiedBadge";
 import type { Profile, Post } from "@/types/database";
 import PostCard from "./PostCard";
+import { useTopLoading } from "./TopLoadingBar";
+import { ProfileSkeleton } from "./Skeleton";
 
 export default function ProfileView({ username: rawUsername }: { username: string }) {
   const username = rawUsername.trim();
   const router = useRouter();
+  const { start, done } = useTopLoading();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [hasActiveStory, setHasActiveStory] = useState(false);
@@ -31,8 +34,13 @@ export default function ProfileView({ username: rawUsername }: { username: strin
   }, [username]);
 
   async function load() {
+    start();
     const { data: p } = await supabase.from("profiles").select("*").eq("username", username).single();
-    if (!p) return setLoading(false);
+    if (!p) {
+      setLoading(false);
+      done();
+      return;
+    }
     setProfile(p);
 
     const { data: { user } } = await supabase.auth.getUser();
@@ -57,6 +65,7 @@ export default function ProfileView({ username: rawUsername }: { username: strin
       setBlocked(await getBlockStatus(p.id));
     }
     setLoading(false);
+    done();
   }
 
   async function handleFollow() {
@@ -120,7 +129,7 @@ export default function ProfileView({ username: rawUsername }: { username: strin
     return (
       <>
         {header}
-        <p className="px-4 py-16 text-center text-sm text-ink-muted">Loading…</p>
+        <ProfileSkeleton />
       </>
     );
   }

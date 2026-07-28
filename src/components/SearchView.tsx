@@ -6,8 +6,10 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import type { Post, Profile } from "@/types/database";
 import VerifiedBadge from "./VerifiedBadge";
+import { useTopLoading } from "./TopLoadingBar";
 
 function SearchViewInner() {
+  const { start, done } = useTopLoading();
   const searchParams = useSearchParams();
   const [query, setQuery] = useState(searchParams.get("q") ?? "");
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -27,6 +29,7 @@ function SearchViewInner() {
 
   async function runSearch() {
     setLoading(true);
+    start();
     const term = query.trim();
 
     const [{ data: profileResults }, { data: postResults }] = await Promise.all([
@@ -42,6 +45,7 @@ function SearchViewInner() {
     setProfiles(profileResults ?? []);
     setPosts(postResults ?? []);
     setLoading(false);
+    done();
   }
 
   return (

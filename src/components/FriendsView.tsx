@@ -3,11 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
+import { useTopLoading } from "./TopLoadingBar";
+import { ListRowSkeleton } from "./Skeleton";
 import type { Profile } from "@/types/database";
 
 type Tab = "requests" | "friends" | "suggestions";
 
 export default function FriendsView() {
+  const { start, done } = useTopLoading();
   const [tab, setTab] = useState<Tab>("requests");
   const [requests, setRequests] = useState<{ id: string; profile: Profile }[]>([]);
   const [friends, setFriends] = useState<Profile[]>([]);
@@ -19,36 +22,41 @@ export default function FriendsView() {
   }, []);
 
   async function load() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return setLoading(false);
+    start();
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-    const { data: pendingRows } = await supabase
-      .from("follows")
-      .select("follower_id, profiles!follows_follower_id_fkey(*)")
-      .eq("following_id", user.id)
-      .eq("status", "pending");
-    setRequests(
-      (pendingRows ?? []).map((r: any) => ({ id: r.follower_id, profile: r.profiles }))
-    );
+      const [{ data: pendingRows }, { data: acceptedRows }, { data: allProfiles }] = await Promise.all([
+        supabase
+          .from("follows")
+          .select("follower_id, profiles!follows_follower_id_fkey(*)")
+          .eq("following_id", user.id)
+          .eq("status", "pending"),
+        supabase
+          .from("follows")
+          .select("follower_id, following_id, profiles!follows_follower_id_fkey(*), profiles_following:follows_following_id_fkey(*)")
+          .or(`follower_id.eq.${user.id},following_id.eq.${user.id}`)
+          .eq("status", "accepted"),
+        supabase.from("profiles").select("*").limit(30),
+      ]);
 
-    const { data: acceptedRows } = await supabase
-      .from("follows")
-      .select("follower_id, following_id, profiles!follows_follower_id_fkey(*), profiles_following:follows_following_id_fkey(*)")
-      .or(`follower_id.eq.${user.id},following_id.eq.${user.id}`)
-      .eq("status", "accepted");
+      const requestList = (pendingRows ?? []).map((r: any) => ({ id: r.follower_id, profile: r.profiles }));
+      setRequests(requestList);
 
-    const friendMap = new Map<string, Profile>();
-    (acceptedRows ?? []).forEach((r: any) => {
-      const other = r.follower_id === user.id ? r.profiles_following : r.profiles;
-      if (other) friendMap.set(other.id, other);
-    });
-    setFriends(Array.from(friendMap.values()));
+      const friendMap = new Map<string, Profile>();
+      (acceptedRows ?? []).forEach((r: any) => {
+        const other = r.follower_id === user.id ? r.profiles_following : r.profiles;
+        if (other) friendMap.set(other.id, other);
+      });
+      setFriends(Array.from(friendMap.values()));
 
-    const excludeIds = new Set([user.id, ...friendMap.keys(), ...requests.map((r) => r.id)]);
-    const { data: allProfiles } = await supabase.from("profiles").select("*").limit(30);
-    setSuggestions((allProfiles ?? []).filter((p) => !excludeIds.has(p.id)));
-
-    setLoading(false);
+      const excludeIds = new Set([user.id, ...friendMap.keys(), ...requestList.map((r) => r.id)]);
+      setSuggestions((allProfiles ?? []).filter((p) => !excludeIds.has(p.id)));
+    } finally {
+      setLoading(false);
+      done();
+    }
   }
 
   async function accept(followerId: string) {
@@ -89,7 +97,7 @@ export default function FriendsView() {
       </div>
 
       <div className="mt-4 px-4">
-        {loading && <p className="text-sm text-ink-muted">Loading…</p>}
+        {loading && Array.from({ length: 4 }).map((_, i) => <ListRowSkeleton key={i} />)}
 
         {!loading && tab === "requests" && (
           requests.length === 0 ? (
