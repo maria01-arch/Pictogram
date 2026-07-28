@@ -1,7 +1,9 @@
-// Matches emoji clusters (including multi-codepoint sequences like flags,
-// skin-tone modifiers, and ZWJ-joined emoji) using the Unicode
-// Extended_Pictographic property, supported in modern JS engines.
-const EMOJI_REGEX = /(?:\p{Extended_Pictographic}(?:\u200d\p{Extended_Pictographic})*)/gu;
+// Matches emoji clusters (including multi-codepoint sequences like ZWJ
+// joins) and the trailing FE0F variation selector that many common emoji
+// use (e.g. "❤️" = U+2764 + U+FE0F) — without consuming FE0F, symbols
+// like heart/checkmark/etc get split into an emoji part plus a stray
+// leftover character, which broke the "is this only emoji" detection.
+const EMOJI_REGEX = /\p{Extended_Pictographic}\uFE0F?(?:\u200d\p{Extended_Pictographic}\uFE0F?)*/gu;
 
 export interface TextPart {
   type: "text" | "emoji";
@@ -30,13 +32,14 @@ export function isOnlyEmoji(text: string): boolean {
   return withoutEmoji.length === 0;
 }
 
-// twemoji's CDN filename convention: lowercase hex codepoints joined by
-// hyphens, with the FE0F variation selector stripped (matches how most
-// of its asset filenames are generated).
-export function twemojiUrl(emoji: string): string {
-  const codepoints = Array.from(emoji)
-    .map((c) => c.codePointAt(0)!.toString(16))
-    .filter((cp) => cp !== "fe0f")
-    .join("-");
-  return `https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/72x72/${codepoints}.png`;
+// WhatsApp-style rule: exactly one emoji and nothing else renders big and
+// bubble-free. Two or more emoji (or emoji mixed with text) render as
+// normal bubbled text.
+export function isSingleEmoji(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  const parts = splitEmoji(trimmed);
+  const emojiParts = parts.filter((p) => p.type === "emoji");
+  const leftoverText = parts.filter((p) => p.type === "text" && p.value.trim().length > 0);
+  return emojiParts.length === 1 && leftoverText.length === 0;
 }

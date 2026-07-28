@@ -46,8 +46,12 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAuthPage = pathname?.startsWith("/auth");
   const isChatThread = pathname?.startsWith("/chat/");
+  const isProfilePage =
+    pathname?.startsWith("/profile/") &&
+    pathname !== "/profile/edit" &&
+    pathname !== "/profile/account-health";
 
-  if (isAuthPage || isChatThread) {
+  if (isAuthPage || isChatThread || isProfilePage) {
     return <>{children}</>;
   }
 

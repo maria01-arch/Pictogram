@@ -9,7 +9,7 @@ import { getBlockStatus } from "@/lib/block";
 import { uploadChatImage } from "@/lib/uploadChatImage";
 import VerifiedBadge from "./VerifiedBadge";
 import EmojiText from "./EmojiText";
-import { isOnlyEmoji } from "@/lib/emoji";
+import { isSingleEmoji } from "@/lib/emoji";
 import type { Message, MessageReaction, Profile } from "@/types/database";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
@@ -309,6 +309,20 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
       </header>
 
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-2.5 no-scrollbar">
+        {messages.length === 0 && otherProfile && (
+          <div className="flex flex-col items-center gap-2 py-16 text-center">
+            <div className="h-20 w-20 overflow-hidden rounded-full bg-brand-gradient">
+              {otherProfile.avatar_url && (
+                <img src={otherProfile.avatar_url} alt="" className="h-full w-full object-cover" />
+              )}
+            </div>
+            <p className="flex items-center gap-1 text-base font-semibold">
+              {otherProfile.username}
+              {otherProfile.is_verified && <VerifiedBadge size={14} />}
+            </p>
+            <p className="mt-1 text-sm text-ink-muted">Send the first message 👋😊</p>
+          </div>
+        )}
         {messages.map((m) => {
           const mine = m.sender_id === userId;
           const grouped = reactionsFor(m.id);
@@ -333,7 +347,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
                     style={{ WebkitTouchCallout: "none" } as React.CSSProperties}
                   />
                 </button>
-              ) : m.content && isOnlyEmoji(m.content) && !quote ? (
+              ) : m.content && isSingleEmoji(m.content) && !quote ? (
                 <div
                   onTouchStart={(e) => startLongPress(m, e.touches[0].clientX, e.touches[0].clientY)}
                   onTouchEnd={cancelLongPress}
