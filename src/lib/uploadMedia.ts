@@ -105,3 +105,78 @@ export async function uploadStory({
 
   onProgress?.("done");
 }
+
+export async function uploadCarouselPost({
+  files,
+  caption,
+  onProgress,
+}: {
+  files: File[];
+  caption: string;
+  onProgress?: (stage: UploadStage) => void;
+}) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("You must be signed in to post.");
+  if (files.length < 2) throw new Error("A carousel needs at least 2 images.");
+  if (files.some((f) => !f.type.startsWith("image/"))) {
+    throw new Error("Carousels support photos only — no videos.");
+  }
+
+  onProgress?.("compressing");
+  const compressedItems = await Promise.all(
+    files.map(async (file) => {
+      const { file: mediaFile, width, height } = await compressImage(file);
+      return { mediaFile, width, height };
+    })
+  );
+
+  const firstThumbBlob = await dataUrlToBlob(await generateTinyPlaceholder(files[0]));
+
+  onProgress?.("uploading");
+  const uploadedUrls: { url: string; width: number; height: number }[] = [];
+  let thumbnailUrl = "";
+
+  for (let i = 0; i < compressedItems.length; i++) {
+    const { mediaFile, width, height } = compressedItems[i];
+    const path = `${user.id}/${crypto.randomUUID()}-${mediaFile.name}`;
+    const { error } = await supabase.storage.from("posts").upload(path, mediaFile, { contentType: mediaFile.type });
+    if (error) throw error;
+    const url = supabase.storage.from("posts").getPublicUrl(path).data.publicUrl;
+    uploadedUrls.push({ url, width, height });
+
+    if (i === 0) {
+      const thumbPath = `${user.id}/${crypto.randomUUID()}-thumb.jpg`;
+      const { error: thumbError } = await supabase.storage.from("posts").upload(thumbPath, firstThumbBlob, { contentType: "image/jpeg" });
+      if (thumbError) throw thumbError;
+      thumbnailUrl = supabase.storage.from("posts").getPublicUrl(thumbPath).data.publicUrl;
+    }
+  }
+
+  onProgress?.("saving");
+  const { data: post, error: postError } = await supabase
+    .from("posts")
+    .insert({
+      user_id: user.id,
+      media_type: "carousel",
+      media_url: null,
+      thumbnail_url: thumbnailUrl,
+      caption: caption || null,
+      width: uploadedUrls[0].width,
+      height: uploadedUrls[0].height,
+    })
+    .select("id")
+    .single();
+  if (postError || !post) throw postError ?? new Error("Failed to create post");
+
+  const mediaRows = uploadedUrls.map((item, i) => ({
+    post_id: post.id,
+    media_url: item.url,
+    width: item.width,
+    height: item.height,
+    position: i,
+  }));
+  const { error: mediaError } = await supabase.from("post_media").insert(mediaRows);
+  if (mediaError) throw mediaError;
+
+  onProgress?.("done");
+}

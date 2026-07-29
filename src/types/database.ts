@@ -1,7 +1,7 @@
 // Hand-written types mirroring supabase/schema.sql.
 // Swap for `supabase gen types typescript` output once the project is live.
 
-export type MediaType = "image" | "video" | "text";
+export type MediaType = "image" | "video" | "text" | "carousel";
 export type StrikeStatus = "active" | "appealed" | "overturned" | "upheld";
 
 export interface Profile {
@@ -31,6 +31,17 @@ export interface Post {
   height: number | null;
   created_at: string;
   profiles?: Pick<Profile, "username" | "avatar_url" | "is_verified">;
+  post_media?: PostMedia[];
+}
+
+export interface PostMedia {
+  id: string;
+  post_id: string;
+  media_url: string;
+  width: number | null;
+  height: number | null;
+  position: number;
+  created_at: string;
 }
 
 export interface Story {

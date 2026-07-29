@@ -8,6 +8,7 @@ import TapToPlayVideo from "./TapToPlayVideo";
 import PostActions from "./PostActions";
 import VerifiedBadge from "./VerifiedBadge";
 import HashtagText from "./HashtagText";
+import PostCarousel from "./PostCarousel";
 
 const CAPTION_LIMIT = 80;
 
@@ -92,6 +93,11 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
             <HashtagText text={post.text_content ?? ""} />
           </p>
         </div>
+      ) : post.media_type === "carousel" ? (
+        <PostCarousel
+          items={post.post_media ?? []}
+          aspectRatio={post.width && post.height ? post.width / post.height : 4 / 5}
+        />
       ) : post.media_type === "video" ? (
         <TapToPlayVideo
           videoUrl={post.media_url!}

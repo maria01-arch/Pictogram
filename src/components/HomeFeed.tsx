@@ -21,8 +21,9 @@ export default function HomeFeed() {
     start();
     const { data, error } = await supabase
       .from("posts")
-      .select("*, profiles!posts_user_id_fkey(username, avatar_url, is_verified)")
+      .select("*, profiles!posts_user_id_fkey(username, avatar_url, is_verified), post_media(*)")
       .order("created_at", { ascending: false })
+      .order("position", { foreignTable: "post_media", ascending: true })
       .range(offset, offset + PAGE_SIZE - 1);
 
     if (error) {
