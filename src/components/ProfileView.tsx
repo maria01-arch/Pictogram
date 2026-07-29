@@ -48,9 +48,10 @@ export default function ProfileView({ username: rawUsername }: { username: strin
 
     const { data: postRows } = await supabase
       .from("posts")
-      .select("*")
+      .select("*, post_media(*)")
       .eq("user_id", p.id)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .order("position", { foreignTable: "post_media", ascending: true });
     setPosts(postRows ?? []);
 
     const { count } = await supabase
