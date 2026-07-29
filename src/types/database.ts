@@ -178,3 +178,22 @@ export interface DatingMatch {
   user_b: string;
   created_at: string;
 }
+
+export type PaymentMethod = "card" | "crypto";
+export type CryptoCurrency = "BTC" | "USDT_TRC20" | "ETH" | "USDT_ERC20" | "XRP";
+export type VerificationStatus = "pending" | "approved" | "rejected";
+
+export interface VerificationApplication {
+  id: string;
+  user_id: string;
+  full_name: string;
+  statement: string | null;
+  id_document_url: string;
+  payment_method: PaymentMethod;
+  crypto_currency: CryptoCurrency | null;
+  tx_screenshot_url: string | null;
+  status: VerificationStatus;
+  reviewer_notes: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+}
