@@ -197,3 +197,18 @@ export interface VerificationApplication {
   reviewed_at: string | null;
   created_at: string;
 }
+
+export type NotificationType = "like" | "comment" | "message" | "follow_request" | "follow_accepted";
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  actor_id: string;
+  type: NotificationType;
+  post_id: string | null;
+  comment_id: string | null;
+  conversation_id: string | null;
+  read: boolean;
+  created_at: string;
+  profiles?: Pick<Profile, "username" | "avatar_url" | "is_verified">;
+}

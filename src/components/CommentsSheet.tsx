@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { getErrorMessage } from "@/lib/errorMessage";
+import { createNotification } from "@/lib/notifications";
 import VerifiedBadge from "./VerifiedBadge";
 import type { Comment } from "@/types/database";
 
-export default function CommentsSheet({ postId, onClose }: { postId: string; onClose: () => void }) {
+export default function CommentsSheet({ postId, postOwnerId, onClose }: { postId: string; postOwnerId?: string; onClose: () => void }) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
@@ -39,6 +40,18 @@ export default function CommentsSheet({ postId, onClose }: { postId: string; onC
     setDraft("");
     const { error } = await supabase.from("comments").insert({ post_id: postId, user_id: user.id, content });
     if (error) return setError(getErrorMessage(error));
+
+    if (postOwnerId) {
+      const { data: me } = await supabase.from("profiles").select("username").eq("id", user.id).single();
+      createNotification({
+        targetUserId: postOwnerId,
+        type: "comment",
+        postId,
+        pushTitle: "New comment",
+        pushBody: `${me?.username ?? "Someone"} commented on your post`,
+      });
+    }
+
     load();
   }
 

@@ -114,7 +114,7 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
         />
       )}
 
-      <PostActions postId={post.id} />
+      <PostActions postId={post.id} postOwnerId={post.user_id} />
 
       {caption && (
         <p className="px-4 pb-3 text-sm leading-snug">

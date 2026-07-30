@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { createNotification } from "./notifications";
 
 export type FollowRelation = "none" | "pending" | "following";
 
@@ -28,12 +29,24 @@ export async function toggleFollow(targetUserId: string, currentRelation: Follow
       .eq("id", targetUserId)
       .single();
 
+    const willBePending = !!target?.requires_follow_approval;
+
     const { error } = await supabase.from("follows").insert({
       follower_id: user.id,
       following_id: targetUserId,
-      status: target?.requires_follow_approval ? "pending" : "accepted",
+      status: willBePending ? "pending" : "accepted",
     });
     if (error) throw error;
+
+    const { data: me } = await supabase.from("profiles").select("username").eq("id", user.id).single();
+    createNotification({
+      targetUserId,
+      type: willBePending ? "follow_request" : "follow_accepted",
+      pushTitle: willBePending ? "New follow request" : "New follower",
+      pushBody: willBePending
+        ? `${me?.username ?? "Someone"} wants to follow you`
+        : `${me?.username ?? "Someone"} started following you`,
+    });
   } else {
     const { error } = await supabase
       .from("follows")

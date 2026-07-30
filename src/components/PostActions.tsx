@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { createNotification } from "@/lib/notifications";
 import CommentsSheet from "./CommentsSheet";
 
-export default function PostActions({ postId }: { postId: string }) {
+export default function PostActions({ postId, postOwnerId }: { postId: string; postOwnerId?: string }) {
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [saved, setSaved] = useState(false);
@@ -50,6 +51,16 @@ export default function PostActions({ postId }: { postId: string }) {
       setLiked(true);
       setLikeCount((c) => c + 1);
       await supabase.from("likes").insert({ post_id: postId, user_id: userId });
+      if (postOwnerId) {
+        const { data: me } = await supabase.from("profiles").select("username").eq("id", userId).single();
+        createNotification({
+          targetUserId: postOwnerId,
+          type: "like",
+          postId,
+          pushTitle: "New like",
+          pushBody: `${me?.username ?? "Someone"} liked your post`,
+        });
+      }
     }
   }
 
@@ -107,7 +118,7 @@ export default function PostActions({ postId }: { postId: string }) {
         </button>
       </div>
 
-      {showComments && <CommentsSheet postId={postId} onClose={() => setShowComments(false)} />}
+      {showComments && <CommentsSheet postId={postId} postOwnerId={postOwnerId} onClose={() => setShowComments(false)} />}
     </>
   );
 }

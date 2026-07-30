@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getBlockStatus } from "@/lib/block";
+import { createNotification } from "@/lib/notifications";
 import { uploadChatImage } from "@/lib/uploadChatImage";
 import VerifiedBadge from "./VerifiedBadge";
 import EmojiText from "./EmojiText";
@@ -194,6 +195,17 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     }
 
     setMessages((prev) => prev.map((m) => (m.id === optimisticId ? data : m)));
+
+    if (otherProfile) {
+      createNotification({
+        targetUserId: otherProfile.id,
+        type: "message",
+        conversationId,
+        pushTitle: "New message",
+        pushBody: content.length > 60 ? content.slice(0, 60) + "…" : content,
+        pushUrl: `/chat/${conversationId}`,
+      });
+    }
   }
 
   async function handleImageSelected(e: React.ChangeEvent<HTMLInputElement>) {

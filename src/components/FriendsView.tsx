@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
+import { createNotification } from "@/lib/notifications";
 import { useTopLoading } from "./TopLoadingBar";
 import { ListRowSkeleton } from "./Skeleton";
 import type { Profile } from "@/types/database";
@@ -63,6 +64,15 @@ export default function FriendsView() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     await supabase.from("follows").update({ status: "accepted" }).eq("follower_id", followerId).eq("following_id", user.id);
+
+    const { data: me } = await supabase.from("profiles").select("username").eq("id", user.id).single();
+    createNotification({
+      targetUserId: followerId,
+      type: "follow_accepted",
+      pushTitle: "Follow request accepted",
+      pushBody: `${me?.username ?? "Someone"} accepted your follow request`,
+    });
+
     load();
   }
 
