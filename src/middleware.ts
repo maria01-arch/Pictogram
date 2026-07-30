@@ -40,5 +40,9 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|webp)$).*)"],
+  // API routes are excluded — they should return their own JSON error
+  // responses (e.g. 401) rather than being redirected to an HTML login
+  // page, which silently broke fetch() calls expecting JSON (like this
+  // one) and made unauthenticated testing tools like curl unusable.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api|.*\\.(?:svg|png|jpg|jpeg|webp)$).*)"],
 };
