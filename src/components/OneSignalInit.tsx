@@ -25,10 +25,11 @@ export default function OneSignalInit() {
 
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        // Ties this browser's push subscription to our own user id, so the
-        // server can target notifications via include_external_user_ids
-        // without us having to store OneSignal player ids ourselves.
         await OneSignal.login(user.id);
+      }
+
+      if (!OneSignal.Notifications.permission) {
+        await OneSignal.Notifications.requestPermission();
       }
     });
 
@@ -36,6 +37,9 @@ export default function OneSignalInit() {
       window.OneSignalDeferred?.push(async (OneSignal: any) => {
         if (session?.user) {
           await OneSignal.login(session.user.id);
+          if (!OneSignal.Notifications.permission) {
+            await OneSignal.Notifications.requestPermission();
+          }
         } else {
           await OneSignal.logout();
         }
