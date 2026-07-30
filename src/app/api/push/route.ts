@@ -18,12 +18,16 @@ export async function POST(request: Request) {
     method: "POST",
     headers: {
       "Content-Type": "application/json; charset=utf-8",
-      // os_v2_app_ keys use "Key", not the older "Basic" scheme.
       Authorization: `Key ${apiKey}`,
     },
     body: JSON.stringify({
       app_id: appId,
-      include_external_user_ids: [targetUserId],
+      // Current OneSignal API: external-id targeting now goes through
+      // include_aliases + an explicit target_channel, not the old
+      // include_external_user_ids field (which is silently accepted but
+      // resolves zero recipients under the newer subscription model).
+      include_aliases: { external_id: [targetUserId] },
+      target_channel: "push",
       headings: { en: title },
       contents: { en: body },
       ...(url ? { url } : {}),
