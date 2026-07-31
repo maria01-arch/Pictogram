@@ -54,10 +54,11 @@ export default function RealtimeNotificationListener() {
                 setDebug((d) => d + " | Notification API not supported, stopping.");
                 return;
               }
-              if (Notification.permission !== "granted") {
-                setDebug((d) => d + ` | permission not granted (${Notification.permission}), stopping.`);
-                return;
-              }
+              // Skipping the permission gate entirely as a test — this
+              // WebView's Notification.permission may just be a broken
+              // stub that always reports "default" regardless of the
+              // actual bridge's behavior.
+              setDebug((d) => d + ` | (permission check skipped, was: ${Notification.permission}) attempting call…`);
 
               const { data: actor } = await supabase
                 .from("profiles")
