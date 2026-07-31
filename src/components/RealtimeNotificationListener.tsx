@@ -17,7 +17,7 @@ export default function RealtimeNotificationListener() {
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) {
         setDebug("no logged-in user");
         return;
@@ -26,10 +26,6 @@ export default function RealtimeNotificationListener() {
       const notifSupported = typeof window !== "undefined" && "Notification" in window;
       let permission = notifSupported ? Notification.permission : "API not present";
 
-      // Call the RAW native API directly — not through OneSignal's wrapper.
-      // webtoapp's bridge watches window.Notification.requestPermission()
-      // itself, and OneSignal's own permission flow apparently doesn't
-      // trigger it inside this specific WebView.
       if (notifSupported && permission === "default") {
         try {
           permission = await Notification.requestPermission();
@@ -54,10 +50,6 @@ export default function RealtimeNotificationListener() {
                 setDebug((d) => d + " | Notification API not supported, stopping.");
                 return;
               }
-              // Skipping the permission gate entirely as a test — this
-              // WebView's Notification.permission may just be a broken
-              // stub that always reports "default" regardless of the
-              // actual bridge's behavior.
               setDebug((d) => d + ` | (permission check skipped, was: ${Notification.permission}) attempting call…`);
 
               const { data: actor } = await supabase
