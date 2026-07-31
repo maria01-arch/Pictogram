@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 const MESSAGES: Record<string, string> = {
@@ -11,19 +11,21 @@ const MESSAGES: Record<string, string> = {
   follow_accepted: "accepted your follow request",
 };
 
-// Complements OneSignal's real push (which needs a service worker and
-// doesn't work in every WebView wrapper). This listens for new
-// notification rows via Supabase Realtime (already enabled on this
-// table) and fires the plain browser Notification API — the same
-// mechanism webtoapp's "Web Notification" bridge maps to a native
-// Android notification, and it works whenever the app is actually open,
-// with or without service worker/push support.
 export default function RealtimeNotificationListener() {
+  const [debug, setDebug] = useState("starting…");
+
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return;
+      if (!user) {
+        setDebug("no logged-in user");
+        return;
+      }
+
+      const notifSupported = typeof window !== "undefined" && "Notification" in window;
+      const permission = notifSupported ? Notification.permission : "API not present";
+      setDebug(`user ${user.id.slice(0, 8)}… | Notification API present: ${notifSupported} | permission: ${permission} | subscribing to realtime…`);
 
       channel = supabase
         .channel(`user-notifications:${user.id}`)
@@ -31,22 +33,36 @@ export default function RealtimeNotificationListener() {
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
           async (payload) => {
-            const notif = payload.new as { type: string; actor_id: string };
+            setDebug((d) => d + " | EVENT RECEIVED!");
+            try {
+              const notif = payload.new as { type: string; actor_id: string };
 
-            if (typeof window === "undefined" || !("Notification" in window)) return;
-            if (Notification.permission !== "granted") return;
+              if (!notifSupported) {
+                setDebug((d) => d + " | Notification API not supported, stopping.");
+                return;
+              }
+              if (Notification.permission !== "granted") {
+                setDebug((d) => d + ` | permission not granted (${Notification.permission}), stopping.`);
+                return;
+              }
 
-            const { data: actor } = await supabase
-              .from("profiles")
-              .select("username")
-              .eq("id", notif.actor_id)
-              .single();
+              const { data: actor } = await supabase
+                .from("profiles")
+                .select("username")
+                .eq("id", notif.actor_id)
+                .single();
 
-            const body = `${actor?.username ?? "Someone"} ${MESSAGES[notif.type] ?? "sent you an update"}`;
-            new Notification("Pictogram", { body });
+              const body = `${actor?.username ?? "Someone"} ${MESSAGES[notif.type] ?? "sent you an update"}`;
+              new Notification("Pictogram", { body });
+              setDebug((d) => d + " | new Notification() called successfully.");
+            } catch (e) {
+              setDebug((d) => d + ` | ERROR: ${e instanceof Error ? e.message : String(e)}`);
+            }
           }
         )
-        .subscribe();
+        .subscribe((status) => {
+          setDebug((d) => d + ` | channel status: ${status}`);
+        });
     });
 
     return () => {
@@ -54,5 +70,9 @@ export default function RealtimeNotificationListener() {
     };
   }, []);
 
-  return null;
+  return (
+    <div className="fixed bottom-32 left-2 right-2 z-[200] break-words rounded-xl2 bg-black/80 p-2 text-[10px] text-white">
+      {debug}
+    </div>
+  );
 }
