@@ -24,7 +24,20 @@ export default function RealtimeNotificationListener() {
       }
 
       const notifSupported = typeof window !== "undefined" && "Notification" in window;
-      const permission = notifSupported ? Notification.permission : "API not present";
+      let permission = notifSupported ? Notification.permission : "API not present";
+
+      // Call the RAW native API directly — not through OneSignal's wrapper.
+      // webtoapp's bridge watches window.Notification.requestPermission()
+      // itself, and OneSignal's own permission flow apparently doesn't
+      // trigger it inside this specific WebView.
+      if (notifSupported && permission === "default") {
+        try {
+          permission = await Notification.requestPermission();
+        } catch (e) {
+          setDebug((d) => d + ` | requestPermission threw: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+
       setDebug(`user ${user.id.slice(0, 8)}… | Notification API present: ${notifSupported} | permission: ${permission} | subscribing to realtime…`);
 
       channel = supabase
