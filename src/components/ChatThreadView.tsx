@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getBlockStatus } from "@/lib/block";
 import { createNotification } from "@/lib/notifications";
+import { markConversationRead } from "@/lib/badgeCounts";
 import { uploadChatImage } from "@/lib/uploadChatImage";
 import VerifiedBadge from "./VerifiedBadge";
 import EmojiText from "./EmojiText";
@@ -67,6 +68,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
       return;
     }
     setUserId(user.id);
+    markConversationRead(conversationId);
 
     const [{ data: participants }, { data: msgs }] = await Promise.all([
       supabase
