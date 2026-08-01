@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 const MESSAGES: Record<string, string> = {
@@ -11,30 +11,29 @@ const MESSAGES: Record<string, string> = {
   follow_accepted: "accepted your follow request",
 };
 
+// Complements OneSignal's real push (which needs a service worker, and
+// doesn't work in every WebView wrapper — confirmed some third-party
+// "web to app" tools have broken or incomplete Notification bridges).
+// This listens for new notification rows via Supabase Realtime and fires
+// the plain browser Notification API whenever the app is actually open,
+// which works in any environment where that API is genuinely functional
+// (real browser tabs, installed PWAs).
 export default function RealtimeNotificationListener() {
-  const [debug, setDebug] = useState("starting…");
-
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
     supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user) {
-        setDebug("no logged-in user");
-        return;
-      }
+      if (!user) return;
 
       const notifSupported = typeof window !== "undefined" && "Notification" in window;
-      let permission = notifSupported ? Notification.permission : "API not present";
-
-      if (notifSupported && permission === "default") {
+      if (notifSupported && Notification.permission === "default") {
         try {
-          permission = await Notification.requestPermission();
-        } catch (e) {
-          setDebug((d) => d + ` | requestPermission threw: ${e instanceof Error ? e.message : String(e)}`);
+          await Notification.requestPermission();
+        } catch {
+          // Some environments' Notification API is non-functional or
+          // incomplete — fail silently rather than break the app.
         }
       }
-
-      setDebug(`user ${user.id.slice(0, 8)}… | Notification API present: ${notifSupported} | permission: ${permission} | subscribing to realtime…`);
 
       channel = supabase
         .channel(`user-notifications:${user.id}`)
@@ -42,16 +41,10 @@ export default function RealtimeNotificationListener() {
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
           async (payload) => {
-            setDebug((d) => d + " | EVENT RECEIVED!");
             try {
+              if (!notifSupported || Notification.permission !== "granted") return;
+
               const notif = payload.new as { type: string; actor_id: string };
-
-              if (!notifSupported) {
-                setDebug((d) => d + " | Notification API not supported, stopping.");
-                return;
-              }
-              setDebug((d) => d + ` | (permission check skipped, was: ${Notification.permission}) attempting call…`);
-
               const { data: actor } = await supabase
                 .from("profiles")
                 .select("username")
@@ -60,15 +53,12 @@ export default function RealtimeNotificationListener() {
 
               const body = `${actor?.username ?? "Someone"} ${MESSAGES[notif.type] ?? "sent you an update"}`;
               new Notification("Pictogram", { body });
-              setDebug((d) => d + " | new Notification() called successfully.");
-            } catch (e) {
-              setDebug((d) => d + ` | ERROR: ${e instanceof Error ? e.message : String(e)}`);
+            } catch {
+              // Best-effort — never let a broken bridge crash the listener.
             }
           }
         )
-        .subscribe((status) => {
-          setDebug((d) => d + ` | channel status: ${status}`);
-        });
+        .subscribe();
     });
 
     return () => {
@@ -76,9 +66,5 @@ export default function RealtimeNotificationListener() {
     };
   }, []);
 
-  return (
-    <div className="fixed bottom-32 left-2 right-2 z-[200] break-words rounded-xl2 bg-black/80 p-2 text-[10px] text-white">
-      {debug}
-    </div>
-  );
+  return null;
 }
