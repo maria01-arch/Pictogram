@@ -1,0 +1,253 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
+import { getFollowRelation, toggleFollow, type FollowRelation } from "@/lib/follow";
+import { getOrCreateDirectConversation } from "@/lib/conversations";
+import { getBlockStatus, blockUser, unblockUser } from "@/lib/block";
+import { getErrorMessage } from "@/lib/errorMessage";
+import VerifiedBadge from "./VerifiedBadge";
+import type { Profile, Post } from "@/types/database";
+import PostCard from "./PostCard";
+import { useTopLoading } from "./TopLoadingBar";
+import { ProfileSkeleton } from "./Skeleton";
+
+export default function ProfileView({ username: rawUsername }: { username: string }) {
+  const username = rawUsername.trim();
+  const router = useRouter();
+  const { start, done } = useTopLoading();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [hasActiveStory, setHasActiveStory] = useState(false);
+  const [relation, setRelation] = useState<FollowRelation>("none");
+  const [isSelf, setIsSelf] = useState(false);
+  const [blocked, setBlocked] = useState({ blockedByMe: false, blockedMe: false });
+  const [loading, setLoading] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [username]);
+
+  async function load() {
+    start();
+    const { data: p } = await supabase.from("profiles").select("*").eq("username", username).single();
+    if (!p) {
+      setLoading(false);
+      done();
+      return;
+    }
+    setProfile(p);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    setIsSelf(user?.id === p.id);
+
+    const { data: postRows } = await supabase
+      .from("posts")
+      .select("*, post_media(*)")
+      .eq("user_id", p.id)
+      .order("created_at", { ascending: false })
+      .order("position", { foreignTable: "post_media", ascending: true });
+    setPosts(postRows ?? []);
+
+    const { count } = await supabase
+      .from("stories")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", p.id)
+      .gt("expires_at", new Date().toISOString());
+    setHasActiveStory((count ?? 0) > 0);
+
+    if (user && user.id !== p.id) {
+      setRelation(await getFollowRelation(p.id));
+      setBlocked(await getBlockStatus(p.id));
+    }
+    setLoading(false);
+    done();
+  }
+
+  async function handleFollow() {
+    if (!profile) return;
+    setError(null);
+    const prev = relation;
+    try {
+      await toggleFollow(profile.id, relation);
+      setRelation(prev === "none" ? (profile.requires_follow_approval ? "pending" : "following") : "none");
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  }
+
+  async function handleMessage() {
+    if (!profile) return;
+    setError(null);
+    try {
+      const conversationId = await getOrCreateDirectConversation(profile.id);
+      router.push(`/chat/${conversationId}`);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  }
+
+  async function handleBlock() {
+    if (!profile) return;
+    setMenuOpen(false);
+    if (!confirm(`Block ${profile.username}? They won't be able to message or follow you.`)) return;
+    try {
+      await blockUser(profile.id);
+      setBlocked((b) => ({ ...b, blockedByMe: true }));
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  }
+
+  async function handleUnblock() {
+    if (!profile) return;
+    setMenuOpen(false);
+    try {
+      await unblockUser(profile.id);
+      setBlocked((b) => ({ ...b, blockedByMe: false }));
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  }
+
+  const header = (
+    <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-black/5 bg-surface-lightMuted px-3 py-3 dark:border-white/5 dark:bg-surface-darkMuted">
+      <button onClick={() => router.back()} aria-label="Back">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      <h1 className="text-lg font-bold">Profile</h1>
+    </header>
+  );
+
+  if (loading) {
+    return (
+      <>
+        {header}
+        <ProfileSkeleton />
+      </>
+    );
+  }
+  if (!profile) {
+    return (
+      <>
+        {header}
+        <p className="px-4 py-16 text-center text-sm text-ink-muted">Profile not found.</p>
+      </>
+    );
+  }
+
+  return (
+    <div className="pb-8">
+      {header}
+      <div className="flex flex-col items-center px-4 pt-6">
+        {!isSelf && (
+          <div className="relative mb-2 ml-auto mr-0 self-end">
+            <button onClick={() => setMenuOpen((o) => !o)} className="p-1 text-ink-muted" aria-label="Profile options">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" />
+              </svg>
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 top-7 z-10 w-40 overflow-hidden rounded-xl2 glass-card shadow-lg">
+                {blocked.blockedByMe ? (
+                  <button onClick={handleUnblock} className="w-full px-3 py-2.5 text-left text-sm font-medium">
+                    Unblock
+                  </button>
+                ) : (
+                  <button onClick={handleBlock} className="w-full px-3 py-2.5 text-left text-sm font-medium text-red-500">
+                    Block
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className={hasActiveStory ? "rounded-full bg-brand-gradient p-0.5" : ""}>
+          <div className="h-24 w-24 overflow-hidden rounded-full border-2 border-surface-lightMuted bg-brand-gradient dark:border-surface-darkMuted">
+            {profile.avatar_url && <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />}
+          </div>
+        </div>
+
+        <h2 className="mt-3 flex items-center gap-1.5 text-lg font-bold">{profile.display_name ?? profile.username}{profile.is_verified && <VerifiedBadge size={16} />}</h2>
+        <p className="text-sm text-ink-muted">@{profile.username}</p>
+        {profile.bio && <p className="mt-2 max-w-xs text-center text-sm">{profile.bio}</p>}
+        {profile.location && <p className="mt-1 text-xs text-ink-muted">📍 {profile.location}</p>}
+
+        {!isSelf && blocked.blockedMe && (
+          <p className="mt-4 text-sm text-ink-muted">This profile isn't available.</p>
+        )}
+
+        {!isSelf && !blocked.blockedMe && !blocked.blockedByMe && (
+          <div className="mt-4 flex gap-2">
+            <button
+              onClick={handleFollow}
+              className={`rounded-full px-5 py-2 text-sm font-semibold ${
+                relation === "none" ? "bg-brand-gradient text-white" : "bg-black/5 text-ink-muted dark:bg-white/10"
+              }`}
+            >
+              {relation === "none" ? "Follow" : relation === "pending" ? "Requested" : "Following"}
+            </button>
+            <button onClick={handleMessage} className="rounded-full bg-black/5 px-5 py-2 text-sm font-semibold dark:bg-white/10">
+              Message
+            </button>
+          </div>
+        )}
+
+        {!isSelf && blocked.blockedByMe && (
+          <p className="mt-4 text-sm text-ink-muted">You've blocked this user.</p>
+        )}
+
+        {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+      </div>
+
+      {!blocked.blockedMe && (
+        <>
+          <div className="mt-6 grid grid-cols-3 gap-0.5 px-0.5">
+            {posts.map((post) => (
+              <button
+                key={post.id}
+                onClick={() => setSelectedPost(post)}
+                className="aspect-square overflow-hidden bg-black/5 dark:bg-white/5"
+              >
+                {post.media_type === "text" ? (
+                  <div className="flex h-full w-full items-center justify-center bg-brand-gradient p-2 text-center text-[10px] text-white">
+                    {post.text_content?.slice(0, 40)}
+                  </div>
+                ) : (
+                  <img src={post.thumbnail_url ?? post.media_url ?? ""} alt="" className="h-full w-full object-cover" />
+                )}
+              </button>
+            ))}
+          </div>
+
+          {posts.length === 0 && <p className="mt-10 text-center text-sm text-ink-muted">No posts yet.</p>}
+        </>
+      )}
+
+      {selectedPost && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 px-3 py-8" onClick={() => setSelectedPost(null)}>
+          <div className="mx-auto max-w-lg" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setSelectedPost(null)} className="mb-2 block text-sm font-semibold text-white">
+              ✕ Close
+            </button>
+            <PostCard
+              post={selectedPost}
+              onDeleted={(id) => {
+                setPosts((prev) => prev.filter((p) => p.id !== id));
+                setSelectedPost(null);
+              }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

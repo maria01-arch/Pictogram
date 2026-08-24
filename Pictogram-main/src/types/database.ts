@@ -1,0 +1,216 @@
+// Hand-written types mirroring supabase/schema.sql.
+// Swap for `supabase gen types typescript` output once the project is live.
+
+export type MediaType = "image" | "video" | "text" | "carousel";
+export type StrikeStatus = "active" | "appealed" | "overturned" | "upheld";
+
+export interface Profile {
+  id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  is_business: boolean;
+  location: string | null;
+  requires_follow_approval: boolean;
+  is_verified: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Post {
+  id: string;
+  user_id: string;
+  media_url: string;
+  media_type: MediaType;
+  thumbnail_url: string | null;
+  blurhash: string | null;
+  text_content: string | null;
+  caption: string | null;
+  width: number | null;
+  height: number | null;
+  created_at: string;
+  moderation_status: "pending" | "approved" | "flagged";
+  profiles?: Pick<Profile, "username" | "avatar_url" | "is_verified">;
+  post_media?: PostMedia[];
+}
+
+export interface PostMedia {
+  id: string;
+  post_id: string;
+  media_url: string;
+  width: number | null;
+  height: number | null;
+  position: number;
+  created_at: string;
+}
+
+export interface Story {
+  id: string;
+  user_id: string;
+  media_url: string;
+  media_type: MediaType;
+  thumbnail_url: string | null;
+  created_at: string;
+  expires_at: string;
+  text_content: string | null;
+}
+
+export interface AccountStrike {
+  id: string;
+  user_id: string;
+  guideline_violated: string;
+  reason: string;
+  evidence_url: string | null;
+  status: StrikeStatus;
+  appeal_text: string | null;
+  appeal_submitted_at: string | null;
+  reviewed_at: string | null;
+  reviewer_notes: string | null;
+  created_at: string;
+}
+
+export interface Conversation {
+  id: string;
+  is_group: boolean;
+  title: string | null;
+  created_at: string;
+}
+
+export interface Message {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  content: string | null;
+  media_url: string | null;
+  reply_to_id: string | null;
+  edited_at: string | null;
+  created_at: string;
+  profiles?: Pick<Profile, "username" | "avatar_url" | "is_verified">;
+}
+
+type TableDef<Row> = {
+  Row: Row;
+  Insert: Partial<Row>;
+  Update: Partial<Row>;
+  Relationships: [];
+};
+
+export interface Database {
+  public: {
+    Tables: {
+      profiles: TableDef<Profile>;
+      posts: TableDef<Post>;
+      stories: TableDef<Story>;
+      account_strikes: TableDef<AccountStrike>;
+      conversations: TableDef<Conversation>;
+      messages: TableDef<Message>;
+    };
+    // Matches the shape Supabase's own `supabase gen types` output uses for
+    // "nothing here" — a real empty object, NOT Record<string, never>
+    // (which is an index signature that maps every key to never and was
+    // the actual cause of the update()/insert() "never" type errors).
+    Views: { [_ in never]: never };
+    Functions: { [_ in never]: never };
+    Enums: { [_ in never]: never };
+    CompositeTypes: { [_ in never]: never };
+  };
+}
+
+export type FollowStatus = "pending" | "accepted";
+
+export interface Like {
+  post_id: string;
+  user_id: string;
+  created_at: string;
+}
+
+export interface SavedPost {
+  post_id: string;
+  user_id: string;
+  created_at: string;
+}
+
+export interface Comment {
+  id: string;
+  post_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  profiles?: Pick<Profile, "username" | "avatar_url" | "is_verified">;
+}
+
+export interface Follow {
+  follower_id: string;
+  following_id: string;
+  status: FollowStatus;
+  created_at: string;
+  profiles?: Profile; // joined profile of whichever side the query selected
+}
+
+export interface MessageReaction {
+  message_id: string;
+  user_id: string;
+  emoji: string;
+  created_at: string;
+}
+
+export interface BlockedUser {
+  blocker_id: string;
+  blocked_id: string;
+  created_at: string;
+}
+
+export interface DatingProfile {
+  user_id: string;
+  enabled: boolean;
+  bio: string | null;
+  updated_at: string;
+  age_confirmed_at: string | null;
+}
+
+export interface DatingLike {
+  liker_id: string;
+  liked_id: string;
+  created_at: string;
+}
+
+export interface DatingMatch {
+  user_a: string;
+  user_b: string;
+  created_at: string;
+}
+
+export type PaymentMethod = "card" | "crypto";
+export type CryptoCurrency = "BTC" | "USDT_TRC20" | "ETH" | "USDT_ERC20" | "XRP";
+export type VerificationStatus = "pending" | "approved" | "rejected";
+
+export interface VerificationApplication {
+  id: string;
+  user_id: string;
+  full_name: string;
+  statement: string | null;
+  id_document_url: string;
+  payment_method: PaymentMethod;
+  crypto_currency: CryptoCurrency | null;
+  tx_screenshot_url: string | null;
+  status: VerificationStatus;
+  reviewer_notes: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+}
+
+export type NotificationType = "like" | "comment" | "message" | "follow_request" | "follow_accepted";
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  actor_id: string;
+  type: NotificationType;
+  post_id: string | null;
+  comment_id: string | null;
+  conversation_id: string | null;
+  read: boolean;
+  created_at: string;
+  profiles?: Pick<Profile, "username" | "avatar_url" | "is_verified">;
+}
