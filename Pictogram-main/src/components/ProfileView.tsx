@@ -10,6 +10,8 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import VerifiedBadge from "./VerifiedBadge";
 import type { Profile, Post } from "@/types/database";
 import PostCard from "./PostCard";
+import ReadMoreText from "./ReadMoreText";
+import ConfirmModal from "./ConfirmModal";
 import { useTopLoading } from "./TopLoadingBar";
 import { ProfileSkeleton } from "./Skeleton";
 
@@ -26,6 +28,7 @@ export default function ProfileView({ username: rawUsername }: { username: strin
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [confirmingBlock, setConfirmingBlock] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -95,7 +98,6 @@ export default function ProfileView({ username: rawUsername }: { username: strin
   async function handleBlock() {
     if (!profile) return;
     setMenuOpen(false);
-    if (!confirm(`Block ${profile.username}? They won't be able to message or follow you.`)) return;
     try {
       await blockUser(profile.id);
       setBlocked((b) => ({ ...b, blockedByMe: true }));
@@ -161,7 +163,7 @@ export default function ProfileView({ username: rawUsername }: { username: strin
                     Unblock
                   </button>
                 ) : (
-                  <button onClick={handleBlock} className="w-full px-3 py-2.5 text-left text-sm font-medium text-red-500">
+                  <button onClick={() => { setMenuOpen(false); setConfirmingBlock(true); }} className="w-full px-3 py-2.5 text-left text-sm font-medium text-red-500">
                     Block
                   </button>
                 )}
@@ -178,7 +180,11 @@ export default function ProfileView({ username: rawUsername }: { username: strin
 
         <h2 className="mt-3 flex items-center gap-1.5 text-lg font-bold">{profile.display_name ?? profile.username}{profile.is_verified && <VerifiedBadge size={16} />}</h2>
         <p className="text-sm text-ink-muted">@{profile.username}</p>
-        {profile.bio && <p className="mt-2 max-w-xs text-center text-sm">{profile.bio}</p>}
+        {profile.bio && (
+          <p className="mt-2 max-w-xs text-center text-sm">
+            <ReadMoreText text={profile.bio} limit={100} />
+          </p>
+        )}
         {profile.location && <p className="mt-1 text-xs text-ink-muted">📍 {profile.location}</p>}
 
         {!isSelf && blocked.blockedMe && (
@@ -247,6 +253,17 @@ export default function ProfileView({ username: rawUsername }: { username: strin
             />
           </div>
         </div>
+      )}
+
+      {confirmingBlock && profile && (
+        <ConfirmModal
+          title={`Block ${profile.username}?`}
+          message="They won't be able to message or follow you."
+          confirmLabel="Block"
+          danger
+          onConfirm={() => { setConfirmingBlock(false); handleBlock(); }}
+          onCancel={() => setConfirmingBlock(false)}
+        />
       )}
     </div>
   );

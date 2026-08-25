@@ -9,6 +9,8 @@ import PostActions from "./PostActions";
 import VerifiedBadge from "./VerifiedBadge";
 import HashtagText from "./HashtagText";
 import PostCarousel from "./PostCarousel";
+import ReadMoreText from "./ReadMoreText";
+import ConfirmModal from "./ConfirmModal";
 
 const CAPTION_LIMIT = 80;
 
@@ -36,12 +38,12 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
   }, []);
 
   const isOwner = userId === post.user_id;
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const caption = post.caption ?? "";
   const isLong = caption.length > CAPTION_LIMIT;
   const displayCaption = !isLong || expanded ? caption : caption.slice(0, CAPTION_LIMIT) + "…";
 
   async function handleDelete() {
-    if (!confirm("Delete this post? This can't be undone.")) return;
     setDeleting(true);
     const { error } = await supabase.from("posts").delete().eq("id", post.id);
     setDeleting(false);
@@ -75,7 +77,7 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
             {menuOpen && (
               <div className="absolute right-0 top-7 z-10 w-32 overflow-hidden rounded-xl2 glass-card shadow-lg">
                 <button
-                  onClick={handleDelete}
+                  onClick={() => { setMenuOpen(false); setConfirmingDelete(true); }}
                   disabled={deleting}
                   className="w-full px-3 py-2.5 text-left text-sm font-medium text-red-500 disabled:opacity-40"
                 >
@@ -90,7 +92,11 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
       {post.media_type === "text" ? (
         <div className="flex min-h-[200px] items-center bg-brand-gradient px-6 py-8">
           <p className="text-lg font-medium leading-relaxed text-white">
-            <HashtagText text={post.text_content ?? ""} />
+            <ReadMoreText
+              text={post.text_content ?? ""}
+              limit={220}
+              render={(t) => <HashtagText text={t} />}
+            />
           </p>
         </div>
       ) : post.media_type === "carousel" ? (
@@ -126,6 +132,17 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
             </button>
           )}
         </p>
+      )}
+
+      {confirmingDelete && (
+        <ConfirmModal
+          title="Delete this post?"
+          message="This can't be undone."
+          confirmLabel="Delete"
+          danger
+          onConfirm={() => { setConfirmingDelete(false); handleDelete(); }}
+          onCancel={() => setConfirmingDelete(false)}
+        />
       )}
     </article>
   );

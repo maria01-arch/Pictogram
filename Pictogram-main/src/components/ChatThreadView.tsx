@@ -9,6 +9,7 @@ import { getBlockStatus } from "@/lib/block";
 import { createNotification } from "@/lib/notifications";
 import { markConversationRead } from "@/lib/badgeCounts";
 import { uploadChatImage, resolveChatMediaUrl } from "@/lib/uploadChatImage";
+import ConfirmModal from "./ConfirmModal";
 import VerifiedBadge from "./VerifiedBadge";
 import EmojiText from "./EmojiText";
 import { useTopLoading } from "./TopLoadingBar";
@@ -71,6 +72,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
   const [userId, setUserId] = useState<string | null>(null);
   const [otherTyping, setOtherTyping] = useState(false);
   const [menu, setMenu] = useState<MenuState | null>(null);
+  const [confirmingDeleteMessage, setConfirmingDeleteMessage] = useState<Message | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [blocked, setBlocked] = useState({ blockedByMe: false, blockedMe: false });
@@ -323,8 +325,6 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     setMenu(null);
   }
   async function handleDelete(message: Message) {
-    setMenu(null);
-    if (!confirm("Delete this message?")) return;
     setMessages((prev) => prev.filter((m) => m.id !== message.id));
     await supabase.from("messages").delete().eq("id", message.id);
   }
@@ -547,7 +547,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
                 {menu.message.content && (
                   <button onClick={() => handleEdit(menu.message)} className="w-full px-4 py-2.5 text-left text-sm">Edit</button>
                 )}
-                <button onClick={() => handleDelete(menu.message)} className="w-full px-4 py-2.5 text-left text-sm text-red-500">Delete</button>
+                <button onClick={() => { setConfirmingDeleteMessage(menu.message); setMenu(null); }} className="w-full px-4 py-2.5 text-left text-sm text-red-500">Delete</button>
               </>
             )}
           </div>
@@ -559,6 +559,16 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
           <img src={lightboxUrl} alt="" className="max-h-[85vh] max-w-[92vw] object-contain" />
           <button onClick={() => setLightboxUrl(null)} className="absolute right-4 top-5 text-white">✕</button>
         </div>
+      )}
+
+      {confirmingDeleteMessage && (
+        <ConfirmModal
+          title="Delete this message?"
+          confirmLabel="Delete"
+          danger
+          onConfirm={() => { const m = confirmingDeleteMessage; setConfirmingDeleteMessage(null); handleDelete(m); }}
+          onCancel={() => setConfirmingDeleteMessage(null)}
+        />
       )}
     </div>
   );

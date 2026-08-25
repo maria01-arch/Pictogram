@@ -5,6 +5,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { createNotification } from "@/lib/notifications";
 import VerifiedBadge from "./VerifiedBadge";
+import ReadMoreText from "./ReadMoreText";
+import ConfirmModal from "./ConfirmModal";
 import type { Comment } from "@/types/database";
 
 export default function CommentsSheet({ postId, postOwnerId, onClose }: { postId: string; postOwnerId?: string; onClose: () => void }) {
@@ -13,6 +15,7 @@ export default function CommentsSheet({ postId, postOwnerId, onClose }: { postId
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     load();
@@ -56,7 +59,6 @@ export default function CommentsSheet({ postId, postOwnerId, onClose }: { postId
   }
 
   async function remove(commentId: string) {
-    if (!confirm("Delete this comment?")) return;
     const { error } = await supabase.from("comments").delete().eq("id", commentId);
     if (error) return setError(getErrorMessage(error));
     setComments((prev) => prev.filter((c) => c.id !== commentId));
@@ -85,10 +87,10 @@ export default function CommentsSheet({ postId, postOwnerId, onClose }: { postId
               </div>
               <div className="flex-1 rounded-2xl bg-black/5 px-3 py-2 text-sm dark:bg-white/10">
                 <span className="mr-1.5 inline-flex items-center gap-1 font-semibold">{c.profiles?.username}{(c.profiles as any)?.is_verified && <VerifiedBadge size={12} />}</span>
-                {c.content}
+                <ReadMoreText text={c.content} limit={140} />
               </div>
               {c.user_id === userId && (
-                <button onClick={() => remove(c.id)} className="shrink-0 text-xs text-red-500">
+                <button onClick={() => setConfirmingDeleteId(c.id)} className="shrink-0 text-xs text-red-500">
                   Delete
                 </button>
               )}
@@ -111,6 +113,16 @@ export default function CommentsSheet({ postId, postOwnerId, onClose }: { postId
           </button>
         </div>
       </div>
+
+      {confirmingDeleteId && (
+        <ConfirmModal
+          title="Delete this comment?"
+          confirmLabel="Delete"
+          danger
+          onConfirm={() => { const id = confirmingDeleteId; setConfirmingDeleteId(null); remove(id); }}
+          onCancel={() => setConfirmingDeleteId(null)}
+        />
+      )}
     </div>
   );
 }
