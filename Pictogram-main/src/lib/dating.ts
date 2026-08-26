@@ -1,5 +1,5 @@
 import { supabase } from "./supabaseClient";
-import type { DatingProfile, Profile } from "@/types/database";
+import type { DatingProfile, Profile } from "../types/database";
 
 export async function getMyDatingProfile(): Promise<DatingProfile | null> {
   const { data: { user } } = await supabase.auth.getUser();
