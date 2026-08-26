@@ -1,3 +1,11 @@
+// @ts-nocheck
+// This file is a Deno edge function, deployed separately via the Supabase
+// CLI (`supabase functions deploy moderate-media`) — it is NOT part of the
+// Next.js app and should never be type-checked by `next build`. Deno's
+// `npm:package@version` import syntax below is invalid outside Deno, which
+// is exactly why this directive is here: without it, Next's TypeScript
+// pass fails the whole production build trying to resolve it.
+//
 // supabase/functions/moderate-media/index.ts
 //
 // Called right after a post/story row is created. Scans the media with
