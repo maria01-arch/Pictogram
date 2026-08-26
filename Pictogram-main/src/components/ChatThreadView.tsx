@@ -8,7 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { getBlockStatus } from "@/lib/block";
 import { createNotification } from "@/lib/notifications";
 import { markConversationRead } from "@/lib/badgeCounts";
-import { uploadChatImage, resolveChatMediaUrl } from "@/lib/uploadChatImage";
+import { uploadChatImage, resolveChatMediaUrl } from "../lib/uploadChatImage";
 import ConfirmModal from "./ConfirmModal";
 import VerifiedBadge from "./VerifiedBadge";
 import EmojiText from "./EmojiText";

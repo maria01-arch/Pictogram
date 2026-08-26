@@ -12,7 +12,7 @@ import {
   fetchMatches,
   type DatingCandidate,
   type DatingMatchSummary,
-} from "@/lib/dating";
+} from "../lib/dating";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { getOrCreateDirectConversation } from "@/lib/conversations";
 import VerifiedBadge from "./VerifiedBadge";
