@@ -44,6 +44,17 @@ async function uploadToBucket(bucket: string, userId: string, mediaFile: File, t
   return { mediaUrl, thumbnailUrl };
 }
 
+async function triggerModeration(table: "posts" | "stories", id: string, mediaUrl: string) {
+  try {
+    await supabase.functions.invoke("moderate-media", { body: { table, id, mediaUrl } });
+  } catch {
+    // Non-fatal: the post/story was already saved as 'pending'. If the scan
+    // call fails (network blip, function cold start, etc.) the content just
+    // stays pending — visible only to its owner — until a retry sweep or
+    // manual review picks it up, rather than the upload itself failing.
+  }
+}
+
 export async function uploadPost({
   file,
   caption,
@@ -63,16 +74,22 @@ export async function uploadPost({
   const { mediaUrl, thumbnailUrl } = await uploadToBucket("posts", user.id, mediaFile, thumbnailBlob);
 
   onProgress?.("saving");
-  const { error } = await supabase.from("posts").insert({
-    user_id: user.id,
-    media_url: mediaUrl,
-    media_type: mediaType,
-    thumbnail_url: thumbnailUrl,
-    caption: caption || null,
-    width,
-    height,
-  });
+  const { data: post, error } = await supabase
+    .from("posts")
+    .insert({
+      user_id: user.id,
+      media_url: mediaUrl,
+      media_type: mediaType,
+      thumbnail_url: thumbnailUrl,
+      caption: caption || null,
+      width,
+      height,
+    })
+    .select("id")
+    .single();
   if (error) throw error;
+
+  await triggerModeration("posts", post.id, mediaType === "video" ? thumbnailUrl : mediaUrl);
 
   onProgress?.("done");
 }
@@ -95,13 +112,19 @@ export async function uploadStory({
 
   onProgress?.("saving");
   // expires_at defaults to now() + 24h at the database level — nothing to set here
-  const { error } = await supabase.from("stories").insert({
-    user_id: user.id,
-    media_url: mediaUrl,
-    media_type: mediaType,
-    thumbnail_url: thumbnailUrl,
-  });
+  const { data: story, error } = await supabase
+    .from("stories")
+    .insert({
+      user_id: user.id,
+      media_url: mediaUrl,
+      media_type: mediaType,
+      thumbnail_url: thumbnailUrl,
+    })
+    .select("id")
+    .single();
   if (error) throw error;
+
+  await triggerModeration("stories", story.id, mediaType === "video" ? thumbnailUrl : mediaUrl);
 
   onProgress?.("done");
 }
@@ -167,6 +190,8 @@ export async function uploadCarouselPost({
     .select("id")
     .single();
   if (postError || !post) throw postError ?? new Error("Failed to create post");
+
+  await triggerModeration("posts", post.id, thumbnailUrl);
 
   const mediaRows = uploadedUrls.map((item, i) => ({
     post_id: post.id,

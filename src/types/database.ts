@@ -30,6 +30,7 @@ export interface Post {
   width: number | null;
   height: number | null;
   created_at: string;
+  moderation_status: "pending" | "approved" | "flagged";
   profiles?: Pick<Profile, "username" | "avatar_url" | "is_verified">;
   post_media?: PostMedia[];
 }
@@ -165,6 +166,7 @@ export interface DatingProfile {
   enabled: boolean;
   bio: string | null;
   updated_at: string;
+  age_confirmed_at: string | null;
 }
 
 export interface DatingLike {

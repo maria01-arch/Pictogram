@@ -20,6 +20,7 @@ export async function uploadTextPost(text: string) {
     text_content: text,
     media_url: null,
     thumbnail_url: null,
+    moderation_status: "approved", // nothing for the image scanner to check
   });
   if (error) throw error;
 }
@@ -35,6 +36,7 @@ export async function uploadTextStory(text: string) {
     text_content: text,
     media_url: null,
     thumbnail_url: null,
+    moderation_status: "approved",
   });
   if (error) throw error;
 }

@@ -8,7 +8,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { getBlockStatus } from "@/lib/block";
 import { createNotification } from "@/lib/notifications";
 import { markConversationRead } from "@/lib/badgeCounts";
-import { uploadChatImage } from "@/lib/uploadChatImage";
+import { uploadChatImage, resolveChatMediaUrl } from "../lib/uploadChatImage";
+import ConfirmModal from "./ConfirmModal";
 import VerifiedBadge from "./VerifiedBadge";
 import EmojiText from "./EmojiText";
 import { useTopLoading } from "./TopLoadingBar";
@@ -26,6 +27,38 @@ interface MenuState {
   y: number;
 }
 
+// chat-media is a private bucket now — media_url on a message is a bare
+// storage path, not a viewable URL. Resolve it to a short-lived signed URL
+// before rendering.
+function ChatImage({ path, onTap }: { path: string; onTap: (url: string) => void }) {
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    resolveChatMediaUrl(path).then((resolved) => {
+      if (!cancelled) setUrl(resolved);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [path]);
+
+  if (!url) {
+    return <div className="h-40 w-48 animate-pulse rounded-2xl bg-black/5 dark:bg-white/10" />;
+  }
+
+  return (
+    <img
+      src={url}
+      alt=""
+      draggable={false}
+      onClick={() => onTap(url)}
+      className="max-h-64 w-full select-none object-cover"
+      style={{ WebkitTouchCallout: "none" } as React.CSSProperties}
+    />
+  );
+}
+
 export default function ChatThreadView({ conversationId }: { conversationId: string }) {
   useViewportHeight();
   const router = useRouter();
@@ -39,6 +72,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
   const [userId, setUserId] = useState<string | null>(null);
   const [otherTyping, setOtherTyping] = useState(false);
   const [menu, setMenu] = useState<MenuState | null>(null);
+  const [confirmingDeleteMessage, setConfirmingDeleteMessage] = useState<Message | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [blocked, setBlocked] = useState({ blockedByMe: false, blockedMe: false });
@@ -291,8 +325,6 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     setMenu(null);
   }
   async function handleDelete(message: Message) {
-    setMenu(null);
-    if (!confirm("Delete this message?")) return;
     setMessages((prev) => prev.filter((m) => m.id !== message.id));
     await supabase.from("messages").delete().eq("id", message.id);
   }
@@ -362,22 +394,15 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
           return (
             <div key={m.id} className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
               {m.media_url ? (
-                <button
-                  onClick={() => handleImageTap(m.media_url!)}
+                <div
                   onTouchStart={(e) => startLongPress(m, e.touches[0].clientX, e.touches[0].clientY)}
                   onTouchEnd={cancelLongPress}
                   onTouchMove={cancelLongPress}
                   onContextMenu={(e) => { e.preventDefault(); setMenu({ message: m, x: e.clientX, y: e.clientY }); }}
                   className="max-w-[65%] overflow-hidden rounded-2xl border border-black/10 dark:border-white/15"
                 >
-                  <img
-                    src={m.media_url}
-                    alt=""
-                    draggable={false}
-                    className="max-h-64 w-full select-none object-cover"
-                    style={{ WebkitTouchCallout: "none" } as React.CSSProperties}
-                  />
-                </button>
+                  <ChatImage path={m.media_url} onTap={handleImageTap} />
+                </div>
               ) : m.content && isSingleEmoji(m.content) && !quote ? (
                 <div
                   onTouchStart={(e) => startLongPress(m, e.touches[0].clientX, e.touches[0].clientY)}
@@ -522,7 +547,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
                 {menu.message.content && (
                   <button onClick={() => handleEdit(menu.message)} className="w-full px-4 py-2.5 text-left text-sm">Edit</button>
                 )}
-                <button onClick={() => handleDelete(menu.message)} className="w-full px-4 py-2.5 text-left text-sm text-red-500">Delete</button>
+                <button onClick={() => { setConfirmingDeleteMessage(menu.message); setMenu(null); }} className="w-full px-4 py-2.5 text-left text-sm text-red-500">Delete</button>
               </>
             )}
           </div>
@@ -534,6 +559,16 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
           <img src={lightboxUrl} alt="" className="max-h-[85vh] max-w-[92vw] object-contain" />
           <button onClick={() => setLightboxUrl(null)} className="absolute right-4 top-5 text-white">✕</button>
         </div>
+      )}
+
+      {confirmingDeleteMessage && (
+        <ConfirmModal
+          title="Delete this message?"
+          confirmLabel="Delete"
+          danger
+          onConfirm={() => { const m = confirmingDeleteMessage; setConfirmingDeleteMessage(null); handleDelete(m); }}
+          onCancel={() => setConfirmingDeleteMessage(null)}
+        />
       )}
     </div>
   );

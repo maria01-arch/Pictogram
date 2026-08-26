@@ -67,6 +67,12 @@ const SECTIONS: { title: string; items: MenuItem[] }[] = [
         description: "Support and guidelines",
         icon: "M12 18h.01M9.1 9a3 3 0 115.7 1.3c-.6 1-1.8 1.4-1.8 2.7v.3",
       },
+      {
+        href: "/privacy-policy",
+        label: "Privacy Policy",
+        description: "How we handle your data",
+        icon: "M9 12h6m-6 4h6M9 8h6M5 4h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1z",
+      },
     ],
   },
 ];

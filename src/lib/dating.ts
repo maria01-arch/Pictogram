@@ -1,11 +1,22 @@
 import { supabase } from "./supabaseClient";
-import type { DatingProfile, Profile } from "@/types/database";
+import type { DatingProfile, Profile } from "../types/database";
 
 export async function getMyDatingProfile(): Promise<DatingProfile | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
   const { data } = await supabase.from("dating_profiles").select("*").eq("user_id", user.id).maybeSingle();
   return data;
+}
+
+// Records an explicit 18+ self-attestation, timestamped. Does not enable
+// the profile by itself — enableDating still needs to be called after.
+export async function confirmDatingAge() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("You must be signed in.");
+  const { error } = await supabase
+    .from("dating_profiles")
+    .upsert({ user_id: user.id, age_confirmed_at: new Date().toISOString() });
+  if (error) throw error;
 }
 
 export async function enableDating(bio: string) {

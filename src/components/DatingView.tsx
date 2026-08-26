@@ -5,13 +5,14 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import {
   getMyDatingProfile,
+  confirmDatingAge,
   enableDating,
   fetchCandidates,
   likeUser,
   fetchMatches,
   type DatingCandidate,
   type DatingMatchSummary,
-} from "@/lib/dating";
+} from "../lib/dating";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { getOrCreateDirectConversation } from "@/lib/conversations";
 import VerifiedBadge from "./VerifiedBadge";
@@ -26,6 +27,8 @@ export default function DatingView() {
   const [tab, setTab] = useState<Tab>("search");
   const [loading, setLoading] = useState(true);
   const [enabled, setEnabled] = useState(false);
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
+  const [ageCheckbox, setAgeCheckbox] = useState(false);
   const [bioDraft, setBioDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -40,6 +43,7 @@ export default function DatingView() {
   useEffect(() => {
     getMyDatingProfile().then((profile) => {
       setEnabled(!!profile?.enabled);
+      setAgeConfirmed(!!profile?.age_confirmed_at);
       setBioDraft(profile?.bio ?? "");
       setLoading(false);
     });
@@ -52,6 +56,16 @@ export default function DatingView() {
   useEffect(() => {
     if (tab === "matches") fetchMatches().then(setMatches);
   }, [tab]);
+
+  async function handleConfirmAge() {
+    setError(null);
+    try {
+      await confirmDatingAge();
+      setAgeConfirmed(true);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  }
 
   async function handleEnable() {
     setError(null);
@@ -133,6 +147,37 @@ export default function DatingView() {
   }
 
   if (loading) return <p className="px-4 py-16 text-center text-sm text-ink-muted">Loading…</p>;
+
+  if (!ageConfirmed) {
+    return (
+      <div className="px-4 pb-8 pt-6">
+        <h2 className="text-lg font-bold">Dating is 18+</h2>
+        <p className="mt-1 text-sm text-ink-muted">
+          Dating is a separate, opt-in part of the app. Before you continue, please confirm the following.
+        </p>
+
+        <label className="mt-6 flex items-start gap-3 rounded-xl2 bg-black/5 p-3 text-sm dark:bg-white/10">
+          <input
+            type="checkbox"
+            checked={ageCheckbox}
+            onChange={(e) => setAgeCheckbox(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0"
+          />
+          <span>I confirm that I am 18 years of age or older.</span>
+        </label>
+
+        {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+
+        <button
+          onClick={handleConfirmAge}
+          disabled={!ageCheckbox}
+          className="mt-4 w-full rounded-full bg-brand-gradient py-3 text-sm font-semibold text-white disabled:opacity-40"
+        >
+          Continue
+        </button>
+      </div>
+    );
+  }
 
   if (!enabled) {
     return (
