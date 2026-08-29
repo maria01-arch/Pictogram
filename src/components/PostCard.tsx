@@ -177,18 +177,6 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
           )}
         </div>
 
-        {/* Floating vertical action rail — replaces the classic icon row
-            beneath the media with something that lives on it instead. */}
-        <div className="absolute bottom-3 right-3">
-          <PostActions
-            postId={post.id}
-            postOwnerId={post.user_id}
-            liked={liked}
-            likeCount={likeCount}
-            onToggleLike={toggleLike}
-          />
-        </div>
-
         {/* Double-tap / double-click heart pop, Instagram-style */}
         {heartPop && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
@@ -199,8 +187,19 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
         )}
       </div>
 
+      {/* Actions now live in the caption area, not floating on the media —
+          on short/text posts a floating rail covered too much of the card
+          and made small posts feel busier than they needed to be. */}
+      <PostActions
+        postId={post.id}
+        postOwnerId={post.user_id}
+        liked={liked}
+        likeCount={likeCount}
+        onToggleLike={toggleLike}
+      />
+
       {caption && (
-        <p className="px-4 py-3 text-sm leading-snug">
+        <p className="px-4 pb-3 text-sm leading-snug">
           <ReadMoreText text={caption} limit={CAPTION_LIMIT} render={(t) => <HashtagText text={t} />} />
         </p>
       )}

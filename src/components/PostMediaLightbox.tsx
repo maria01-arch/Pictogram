@@ -2,6 +2,7 @@
 
 import type { Post } from "@/types/database";
 import Portal from "./Portal";
+import { useScrollLock } from "@/lib/useScrollLock";
 
 // Opened by a long-press on a post's media. Deliberately bare — no header,
 // no username, no like/comment/save rail, just the media itself on a
@@ -9,6 +10,7 @@ import Portal from "./Portal";
 // tapping the media itself does not (so carousel swiping and video controls
 // still work without accidentally closing the viewer).
 export default function PostMediaLightbox({ post, onClose }: { post: Post; onClose: () => void }) {
+  useScrollLock();
   const carouselItems = post.media_type === "carousel" ? post.post_media ?? [] : null;
 
   return (

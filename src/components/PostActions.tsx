@@ -67,33 +67,32 @@ export default function PostActions({
 
   return (
     <>
-      {/* Fixed-height horizontal pill — a vertical stack risked exceeding
-          shorter media (short text cards, small-aspect images) and
-          spilling out past the card edge. A single row can't do that:
-          height stays constant (~40px) no matter how many icons are in it. */}
-      <div className="flex h-10 items-center gap-3 rounded-full bg-black/35 px-3.5 backdrop-blur-md">
-        <button onClick={onToggleLike} className="flex items-center gap-1" aria-label="Like">
-          <svg width="19" height="19" viewBox="0 0 24 24" fill={liked ? "#EF4444" : "none"} stroke={liked ? "#EF4444" : "white"} strokeWidth="1.8">
+      {/* Flat, minimal row — this now sits in the caption area on the
+          card's normal background, not floating over an image, so it
+          uses the page's ink color instead of white/translucent-on-dark. */}
+      <div className="flex items-center gap-4 px-4 pt-2.5 pb-1 text-ink-light dark:text-ink-dark">
+        <button onClick={onToggleLike} className="flex items-center gap-1.5" aria-label="Like">
+          <svg width="21" height="21" viewBox="0 0 24 24" fill={liked ? "#EF4444" : "none"} stroke={liked ? "#EF4444" : "currentColor"} strokeWidth="1.8">
             <path d="M20.8 8.6c0 4.7-8.8 10-8.8 10s-8.8-5.3-8.8-10a4.6 4.6 0 018.8-1.9A4.6 4.6 0 0120.8 8.6z" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          {likeCount > 0 && <span className="text-xs font-semibold text-white">{likeCount}</span>}
+          {likeCount > 0 && <span className="text-xs font-semibold">{likeCount}</span>}
         </button>
 
-        <button onClick={() => setShowComments(true)} className="flex items-center gap-1" aria-label="Comments">
-          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8">
+        <button onClick={() => setShowComments(true)} className="flex items-center gap-1.5" aria-label="Comments">
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
             <path d="M21 11.5a8.38 8.38 0 01-8.5 8.5 8.5 8.5 0 01-4-1L3 20l1-5.5A8.38 8.38 0 0112 3a8.38 8.38 0 019 8.5z" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          {commentCount > 0 && <span className="text-xs font-semibold text-white">{commentCount}</span>}
+          {commentCount > 0 && <span className="text-xs font-semibold">{commentCount}</span>}
         </button>
 
         <button onClick={share} aria-label="Share">
-          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8">
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
             <path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7M16 6l-4-4-4 4M12 2v14" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
 
-        <button onClick={toggleSave} aria-label="Save">
-          <svg width="19" height="19" viewBox="0 0 24 24" fill={saved ? "white" : "none"} stroke="white" strokeWidth="1.8">
+        <button onClick={toggleSave} className="ml-auto" aria-label="Save">
+          <svg width="21" height="21" viewBox="0 0 24 24" fill={saved ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8">
             <path d="M6 3h12a1 1 0 011 1v17l-7-4-7 4V4a1 1 0 011-1z" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>

@@ -9,6 +9,7 @@ import ReadMoreText from "./ReadMoreText";
 import ConfirmModal from "./ConfirmModal";
 import type { Comment } from "@/types/database";
 import Portal from "./Portal";
+import { useScrollLock } from "@/lib/useScrollLock";
 
 export default function CommentsSheet({ postId, postOwnerId, onClose }: { postId: string; postOwnerId?: string; onClose: () => void }) {
   const [comments, setComments] = useState<Comment[]>([]);
@@ -17,6 +18,7 @@ export default function CommentsSheet({ postId, postOwnerId, onClose }: { postId
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  useScrollLock();
 
   useEffect(() => {
     load();
