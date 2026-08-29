@@ -16,23 +16,45 @@ export default function HomeFeed() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  // Generated once per mount (i.e. once per page load/refresh) and reused
+  // for every paginated call in this session — see add_feed_ranking.sql.
+  const seedRef = useRef(Math.random() * 2 - 1);
 
   const loadPosts = useCallback(async (offset: number) => {
     start();
-    const { data, error } = await supabase
-      .from("posts")
-      .select("*, profiles!posts_user_id_fkey(username, avatar_url, is_verified), post_media(*)")
-      .order("created_at", { ascending: false })
-      .order("position", { foreignTable: "post_media", ascending: true })
-      .range(offset, offset + PAGE_SIZE - 1);
+    const { data: rankedRows, error: rankError } = await supabase.rpc("feed_ranked_ids", {
+      page_limit: PAGE_SIZE,
+      page_offset: offset,
+      seed: seedRef.current,
+    });
 
-    if (error) {
-      console.error("Failed to load feed:", error.message);
+    if (rankError || !rankedRows || rankedRows.length === 0) {
+      if (rankError) console.error("Failed to rank feed:", rankError.message);
+      setHasMore(false);
+      done();
       return;
     }
 
-    setPosts((prev) => (offset === 0 ? data ?? [] : [...prev, ...(data ?? [])]));
-    setHasMore((data?.length ?? 0) === PAGE_SIZE);
+    const ids = rankedRows.map((r: { id: string }) => r.id);
+    const { data, error } = await supabase
+      .from("posts")
+      .select("*, profiles!posts_user_id_fkey(username, avatar_url, is_verified), post_media(*)")
+      .in("id", ids)
+      .order("position", { foreignTable: "post_media", ascending: true });
+
+    if (error) {
+      console.error("Failed to load feed:", error.message);
+      done();
+      return;
+    }
+
+    // .in() doesn't preserve the id order we asked for — re-sort to match
+    // the ranking the RPC actually gave us.
+    const rank = new Map(ids.map((id: string, i: number) => [id, i]));
+    const ordered = [...(data ?? [])].sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
+
+    setPosts((prev) => (offset === 0 ? ordered : [...prev, ...ordered]));
+    setHasMore(ids.length === PAGE_SIZE);
     done();
   }, [done, start]);
 

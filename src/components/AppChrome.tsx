@@ -63,6 +63,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
     pathname?.startsWith("/profile/") &&
     pathname !== "/profile/edit" &&
     pathname !== "/profile/account-health";
+  const isSavedPage = pathname === "/saved";
 
   // Home-feed-only "full screen" effect: the header slides up out of the
   // way on scroll-down and slides back in on scroll-up, like a lot of
@@ -85,7 +86,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, [pathname]);
 
-  if (isAuthPage || isChatThread || isProfilePage) {
+  if (isAuthPage || isChatThread || isProfilePage || isSavedPage) {
     return <>{children}</>;
   }
 

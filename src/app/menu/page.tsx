@@ -33,6 +33,12 @@ const SECTIONS: { title: string; items: MenuItem[] }[] = [
         description: "Manage your dating profile",
         icon: "M20.8 8.6c0 4.7-8.8 10-8.8 10s-8.8-5.3-8.8-10a4.6 4.6 0 018.8-1.9A4.6 4.6 0 0120.8 8.6z",
       },
+      {
+        href: "/saved",
+        label: "Saved",
+        description: "Posts you've bookmarked",
+        icon: "M6 3h12a1 1 0 011 1v17l-7-4-7 4V4a1 1 0 011-1z",
+      },
     ],
   },
   {
