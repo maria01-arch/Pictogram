@@ -1,6 +1,7 @@
 "use client";
 
 import type { Post } from "@/types/database";
+import Portal from "./Portal";
 
 // Opened by a long-press on a post's media. Deliberately bare — no header,
 // no username, no like/comment/save rail, just the media itself on a
@@ -11,6 +12,7 @@ export default function PostMediaLightbox({ post, onClose }: { post: Post; onClo
   const carouselItems = post.media_type === "carousel" ? post.post_media ?? [] : null;
 
   return (
+    <Portal>
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-2xl"
       onClick={onClose}
@@ -59,5 +61,6 @@ export default function PostMediaLightbox({ post, onClose }: { post: Post; onClo
         />
       )}
     </div>
+    </Portal>
   );
 }

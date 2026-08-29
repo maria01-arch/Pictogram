@@ -1,5 +1,7 @@
 "use client";
 
+import Portal from "./Portal";
+
 // Native window.confirm() shows the browser/OS chrome with the site's URL
 // ("yoursite.com says…"), which looks broken/untrustworthy in an app. This
 // is a plain in-app replacement — render it conditionally from local state:
@@ -35,6 +37,7 @@ export default function ConfirmModal({
   onCancel: () => void;
 }) {
   return (
+    <Portal>
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm sm:items-center"
       onClick={onCancel}
@@ -64,5 +67,6 @@ export default function ConfirmModal({
         </div>
       </div>
     </div>
+    </Portal>
   );
 }

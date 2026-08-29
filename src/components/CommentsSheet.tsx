@@ -8,6 +8,7 @@ import VerifiedBadge from "./VerifiedBadge";
 import ReadMoreText from "./ReadMoreText";
 import ConfirmModal from "./ConfirmModal";
 import type { Comment } from "@/types/database";
+import Portal from "./Portal";
 
 export default function CommentsSheet({ postId, postOwnerId, onClose }: { postId: string; postOwnerId?: string; onClose: () => void }) {
   const [comments, setComments] = useState<Comment[]>([]);
@@ -65,6 +66,7 @@ export default function CommentsSheet({ postId, postOwnerId, onClose }: { postId
   }
 
   return (
+    <Portal>
     <div className="fixed inset-0 z-40 flex items-end bg-black/40" onClick={onClose}>
       <div
         className="max-h-[75vh] w-full rounded-t-2xl bg-surface-lightMuted dark:bg-surface-dark"
@@ -124,5 +126,6 @@ export default function CommentsSheet({ postId, postOwnerId, onClose }: { postId
         />
       )}
     </div>
+    </Portal>
   );
 }

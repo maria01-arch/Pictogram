@@ -12,6 +12,7 @@ import PostCarousel from "./PostCarousel";
 import ReadMoreText from "./ReadMoreText";
 import ConfirmModal from "./ConfirmModal";
 import PostMediaLightbox from "./PostMediaLightbox";
+import { usePostLike } from "@/lib/usePostLike";
 
 const CAPTION_LIMIT = 80;
 
@@ -44,6 +45,9 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
 
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressFiredRef = useRef(false);
+  const lastTapRef = useRef(0);
+  const [heartPop, setHeartPop] = useState(false);
+  const { liked, likeCount, like, toggleLike } = usePostLike(post.id, post.user_id);
 
   function startLongPress() {
     longPressFiredRef.current = false;
@@ -52,8 +56,27 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
       setLightboxOpen(true);
     }, 450);
   }
+  function handleTapEnd() {
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    if (longPressFiredRef.current) return; // that was a long-press, not a tap
+
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      like();
+      setHeartPop(true);
+      setTimeout(() => setHeartPop(false), 700);
+      lastTapRef.current = 0;
+    } else {
+      lastTapRef.current = now;
+    }
+  }
   function cancelLongPress() {
     if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+  }
+  function handleDoubleClick() {
+    like();
+    setHeartPop(true);
+    setTimeout(() => setHeartPop(false), 700);
   }
 
   async function handleDelete() {
@@ -72,8 +95,9 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
       <div className="relative">
         <div
           onTouchStart={startLongPress}
-          onTouchEnd={cancelLongPress}
+          onTouchEnd={handleTapEnd}
           onTouchMove={cancelLongPress}
+          onDoubleClick={handleDoubleClick}
           onContextMenu={(e) => { e.preventDefault(); setLightboxOpen(true); }}
         >
           {post.media_type === "text" ? (
@@ -156,8 +180,23 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
         {/* Floating vertical action rail — replaces the classic icon row
             beneath the media with something that lives on it instead. */}
         <div className="absolute bottom-3 right-3">
-          <PostActions postId={post.id} postOwnerId={post.user_id} />
+          <PostActions
+            postId={post.id}
+            postOwnerId={post.user_id}
+            liked={liked}
+            likeCount={likeCount}
+            onToggleLike={toggleLike}
+          />
         </div>
+
+        {/* Double-tap / double-click heart pop, Instagram-style */}
+        {heartPop && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <svg className="heart-pop-anim" width="90" height="90" viewBox="0 0 24 24" fill="#EF4444" stroke="white" strokeWidth="1">
+              <path d="M20.8 8.6c0 4.7-8.8 10-8.8 10s-8.8-5.3-8.8-10a4.6 4.6 0 018.8-1.9A4.6 4.6 0 0120.8 8.6z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+        )}
       </div>
 
       {caption && (
