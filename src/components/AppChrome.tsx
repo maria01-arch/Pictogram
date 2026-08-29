@@ -71,7 +71,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <header className="sticky top-0 z-30 glass-card">
+      <header className="safe-top sticky top-0 z-30 glass-card">
         <div className="mx-auto flex max-w-lg items-center justify-between px-4 py-3">
           {titledRoute ? (
             <h1 className="text-xl font-bold text-black dark:text-white">{titledRoute.title}</h1>
@@ -89,7 +89,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
 
       <main className="mx-auto max-w-lg pb-16">{children}</main>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-30 glass-card">
+      <nav className="safe-bottom fixed bottom-0 left-0 right-0 z-30 glass-card">
         <div className="mx-auto flex max-w-lg items-center justify-around py-2">
           {NAV_ITEMS.map((item) => {
             const navCount = item.href === "/chat" ? chats : item.href === "/friends" ? friendRequests : 0;

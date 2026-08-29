@@ -32,6 +32,10 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  // viewportFit: "cover" lets content extend under the status bar/notch —
+  // required for the transparent status bar in the webtoapp wrapper.
+  // Without it, safe-area-inset-* below always evaluates to 0.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

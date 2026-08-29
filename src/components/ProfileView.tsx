@@ -118,7 +118,7 @@ export default function ProfileView({ username: rawUsername }: { username: strin
   }
 
   const header = (
-    <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-black/5 bg-surface-lightMuted px-3 py-3 dark:border-white/5 dark:bg-surface-darkMuted">
+    <header className="safe-top sticky top-0 z-30 flex items-center gap-3 border-b border-black/5 bg-surface-lightMuted px-3 py-3 dark:border-white/5 dark:bg-surface-darkMuted">
       <button onClick={() => router.back()} aria-label="Back">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />

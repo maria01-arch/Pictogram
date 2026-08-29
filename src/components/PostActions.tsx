@@ -90,31 +90,39 @@ export default function PostActions({ postId, postOwnerId }: { postId: string; p
 
   return (
     <>
-      <div className="flex items-center gap-4 px-4 py-2.5">
-        <button onClick={toggleLike} className="flex items-center gap-1.5" aria-label="Like">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill={liked ? "#EF4444" : "none"} stroke={liked ? "#EF4444" : "currentColor"} strokeWidth="1.8">
-            <path d="M20.8 8.6c0 4.7-8.8 10-8.8 10s-8.8-5.3-8.8-10a4.6 4.6 0 018.8-1.9A4.6 4.6 0 0120.8 8.6z" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          {likeCount > 0 && <span className="text-sm">{likeCount}</span>}
+      <div className="flex flex-col items-center gap-4">
+        <button onClick={toggleLike} className="flex flex-col items-center gap-1" aria-label="Like">
+          <span className="grid h-11 w-11 place-items-center rounded-full bg-black/35 backdrop-blur-md">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill={liked ? "#EF4444" : "none"} stroke={liked ? "#EF4444" : "white"} strokeWidth="1.8">
+              <path d="M20.8 8.6c0 4.7-8.8 10-8.8 10s-8.8-5.3-8.8-10a4.6 4.6 0 018.8-1.9A4.6 4.6 0 0120.8 8.6z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+          {likeCount > 0 && <span className="text-xs font-semibold text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.5)]">{likeCount}</span>}
         </button>
 
-        <button onClick={() => setShowComments(true)} className="flex items-center gap-1.5" aria-label="Comments">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <path d="M21 11.5a8.38 8.38 0 01-8.5 8.5 8.5 8.5 0 01-4-1L3 20l1-5.5A8.38 8.38 0 0112 3a8.38 8.38 0 019 8.5z" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          {commentCount > 0 && <span className="text-sm">{commentCount}</span>}
+        <button onClick={() => setShowComments(true)} className="flex flex-col items-center gap-1" aria-label="Comments">
+          <span className="grid h-11 w-11 place-items-center rounded-full bg-black/35 backdrop-blur-md">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8">
+              <path d="M21 11.5a8.38 8.38 0 01-8.5 8.5 8.5 8.5 0 01-4-1L3 20l1-5.5A8.38 8.38 0 0112 3a8.38 8.38 0 019 8.5z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+          {commentCount > 0 && <span className="text-xs font-semibold text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.5)]">{commentCount}</span>}
         </button>
 
-        <button onClick={share} aria-label="Share">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7M16 6l-4-4-4 4M12 2v14" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+        <button onClick={share} className="flex flex-col items-center gap-1" aria-label="Share">
+          <span className="grid h-11 w-11 place-items-center rounded-full bg-black/35 backdrop-blur-md">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8">
+              <path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7M16 6l-4-4-4 4M12 2v14" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
         </button>
 
-        <button onClick={toggleSave} className="ml-auto" aria-label="Save">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill={saved ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8">
-            <path d="M6 3h12a1 1 0 011 1v17l-7-4-7 4V4a1 1 0 011-1z" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+        <button onClick={toggleSave} className="flex flex-col items-center gap-1" aria-label="Save">
+          <span className="grid h-11 w-11 place-items-center rounded-full bg-black/35 backdrop-blur-md">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill={saved ? "white" : "none"} stroke="white" strokeWidth="1.8">
+              <path d="M6 3h12a1 1 0 011 1v17l-7-4-7 4V4a1 1 0 011-1z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
         </button>
       </div>
 

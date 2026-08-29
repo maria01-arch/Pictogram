@@ -30,7 +30,6 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
   const username = post.profiles?.username;
   const [userId, setUserId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -40,8 +39,6 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
   const isOwner = userId === post.user_id;
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const caption = post.caption ?? "";
-  const isLong = caption.length > CAPTION_LIMIT;
-  const displayCaption = !isLong || expanded ? caption : caption.slice(0, CAPTION_LIMIT) + "…";
 
   async function handleDelete() {
     setDeleting(true);
@@ -55,82 +52,94 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
   }
 
   return (
-    <article className="mb-4 overflow-hidden rounded-xl2 glass-card shadow-sm">
-      <div className="flex items-center gap-3 px-4 py-3">
-        <Link href={username ? `/profile/${username}` : "#"} className="flex min-w-0 flex-1 items-center gap-3">
-          <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-brand-gradient">
-            {post.profiles?.avatar_url && (
-              <img src={post.profiles.avatar_url} alt="" className="h-full w-full object-cover" />
-            )}
+    <article className="mb-5 overflow-hidden rounded-3xl glass-card shadow-sm">
+      <div className="relative">
+        {post.media_type === "text" ? (
+          <div className="flex min-h-[220px] items-center bg-brand-gradient px-6 pb-8 pt-16">
+            <p className="text-lg font-medium leading-relaxed text-white">
+              <ReadMoreText
+                text={post.text_content ?? ""}
+                limit={220}
+                render={(t) => <HashtagText text={t} />}
+              />
+            </p>
           </div>
-          <p className="flex items-center gap-1 truncate text-sm font-semibold">{username ?? "unknown"}{post.profiles?.is_verified && <VerifiedBadge />}</p>
-        </Link>
-        <span className="shrink-0 text-xs text-ink-muted">{timeAgo(post.created_at)}</span>
-
-        {isOwner && (
-          <div className="relative shrink-0">
-            <button onClick={() => setMenuOpen((o) => !o)} className="p-1 text-ink-muted" aria-label="Post options">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" />
-              </svg>
-            </button>
-            {menuOpen && (
-              <div className="absolute right-0 top-7 z-10 w-32 overflow-hidden rounded-xl2 glass-card shadow-lg">
-                <button
-                  onClick={() => { setMenuOpen(false); setConfirmingDelete(true); }}
-                  disabled={deleting}
-                  className="w-full px-3 py-2.5 text-left text-sm font-medium text-red-500 disabled:opacity-40"
-                >
-                  {deleting ? "Deleting…" : "Delete post"}
-                </button>
-              </div>
-            )}
-          </div>
+        ) : post.media_type === "carousel" ? (
+          <PostCarousel
+            items={post.post_media ?? []}
+            aspectRatio={post.width && post.height ? post.width / post.height : 4 / 5}
+          />
+        ) : post.media_type === "video" ? (
+          <TapToPlayVideo
+            videoUrl={post.media_url!}
+            thumbnailUrl={post.thumbnail_url}
+            aspectRatio={post.width && post.height ? post.width / post.height : 4 / 5}
+          />
+        ) : (
+          <img
+            src={post.media_url!}
+            alt={post.caption ?? ""}
+            loading="lazy"
+            className="w-full object-cover"
+            style={{ aspectRatio: post.width && post.height ? post.width / post.height : 4 / 5 }}
+          />
         )}
+
+        {/* Identity bar floats directly on the media instead of a separate
+            header row above it — the media is the card, not a slot inside it. */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between bg-gradient-to-b from-black/55 via-black/10 to-transparent p-3">
+          <Link
+            href={username ? `/profile/${username}` : "#"}
+            className="pointer-events-auto flex min-w-0 items-center gap-2 rounded-full bg-black/25 py-1 pl-1 pr-3 backdrop-blur-md"
+          >
+            <div className="h-7 w-7 shrink-0 overflow-hidden rounded-full bg-brand-gradient ring-2 ring-white/40">
+              {post.profiles?.avatar_url && (
+                <img src={post.profiles.avatar_url} alt="" className="h-full w-full object-cover" />
+              )}
+            </div>
+            <span className="flex min-w-0 items-center gap-1 truncate text-xs font-semibold text-white">
+              {username ?? "unknown"}
+              {post.profiles?.is_verified && <VerifiedBadge />}
+            </span>
+            <span className="shrink-0 text-[11px] text-white/70">· {timeAgo(post.created_at)}</span>
+          </Link>
+
+          {isOwner && (
+            <div className="pointer-events-auto relative shrink-0">
+              <button
+                onClick={() => setMenuOpen((o) => !o)}
+                className="grid h-8 w-8 place-items-center rounded-full bg-black/25 text-white backdrop-blur-md"
+                aria-label="Post options"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" />
+                </svg>
+              </button>
+              {menuOpen && (
+                <div className="absolute right-0 top-9 z-10 w-32 overflow-hidden rounded-xl2 glass-card shadow-lg">
+                  <button
+                    onClick={() => { setMenuOpen(false); setConfirmingDelete(true); }}
+                    disabled={deleting}
+                    className="w-full px-3 py-2.5 text-left text-sm font-medium text-red-500 disabled:opacity-40"
+                  >
+                    {deleting ? "Deleting…" : "Delete post"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Floating vertical action rail — replaces the classic icon row
+            beneath the media with something that lives on it instead. */}
+        <div className="absolute bottom-3 right-3">
+          <PostActions postId={post.id} postOwnerId={post.user_id} />
+        </div>
       </div>
 
-      {post.media_type === "text" ? (
-        <div className="flex min-h-[200px] items-center bg-brand-gradient px-6 py-8">
-          <p className="text-lg font-medium leading-relaxed text-white">
-            <ReadMoreText
-              text={post.text_content ?? ""}
-              limit={220}
-              render={(t) => <HashtagText text={t} />}
-            />
-          </p>
-        </div>
-      ) : post.media_type === "carousel" ? (
-        <PostCarousel
-          items={post.post_media ?? []}
-          aspectRatio={post.width && post.height ? post.width / post.height : 4 / 5}
-        />
-      ) : post.media_type === "video" ? (
-        <TapToPlayVideo
-          videoUrl={post.media_url!}
-          thumbnailUrl={post.thumbnail_url}
-          aspectRatio={post.width && post.height ? post.width / post.height : 4 / 5}
-        />
-      ) : (
-        <img
-          src={post.media_url!}
-          alt={post.caption ?? ""}
-          loading="lazy"
-          className="w-full object-cover"
-          style={{ aspectRatio: post.width && post.height ? post.width / post.height : 4 / 5 }}
-        />
-      )}
-
-      <PostActions postId={post.id} postOwnerId={post.user_id} />
-
       {caption && (
-        <p className="px-4 pb-3 text-sm leading-snug">
-          <span className="mr-1.5 font-semibold">{username}</span>
-          <HashtagText text={displayCaption} />
-          {isLong && (
-            <button onClick={() => setExpanded((e) => !e)} className="ml-1 font-medium text-ink-muted">
-              {expanded ? "less" : "more"}
-            </button>
-          )}
+        <p className="px-4 py-3 text-sm leading-snug">
+          <ReadMoreText text={caption} limit={CAPTION_LIMIT} render={(t) => <HashtagText text={t} />} />
         </p>
       )}
 

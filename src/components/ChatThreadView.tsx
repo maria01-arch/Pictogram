@@ -32,16 +32,29 @@ interface MenuState {
 // before rendering.
 function ChatImage({ path, onTap }: { path: string; onTap: (url: string) => void }) {
   const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    setUrl(null);
+    setFailed(false);
     resolveChatMediaUrl(path).then((resolved) => {
-      if (!cancelled) setUrl(resolved);
+      if (cancelled) return;
+      if (resolved) setUrl(resolved);
+      else setFailed(true);
     });
     return () => {
       cancelled = true;
     };
   }, [path]);
+
+  if (failed) {
+    return (
+      <div className="flex h-24 w-48 items-center justify-center rounded-2xl bg-black/5 text-xs text-ink-muted dark:bg-white/10">
+        Image unavailable
+      </div>
+    );
+  }
 
   if (!url) {
     return <div className="h-40 w-48 animate-pulse rounded-2xl bg-black/5 dark:bg-white/10" />;
@@ -345,7 +358,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
 
   return (
     <div className="flex flex-col" style={{ height: "var(--app-height, 100dvh)" }}>
-      <header className="flex shrink-0 items-center gap-2.5 border-b border-black/5 px-3 py-2 dark:border-white/5">
+      <header className="safe-top flex shrink-0 items-center gap-2.5 border-b border-black/5 px-3 py-2 dark:border-white/5">
         <button onClick={() => router.back()} aria-label="Back" className="shrink-0">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />

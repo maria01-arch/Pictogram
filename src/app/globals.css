@@ -33,6 +33,17 @@ html.dark {
            border border-black/5 dark:border-white/5;
   }
 
+  /* For the transparent-status-bar webtoapp wrapper: pads content below
+     the notch/status bar and above the home-indicator/gesture bar.
+     env(safe-area-inset-*) is 0 in a normal browser, so this is a no-op
+     there and only takes effect inside the wrapped app. */
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
