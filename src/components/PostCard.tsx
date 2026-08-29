@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import type { Post } from "@/types/database";
@@ -11,6 +11,7 @@ import HashtagText from "./HashtagText";
 import PostCarousel from "./PostCarousel";
 import ReadMoreText from "./ReadMoreText";
 import ConfirmModal from "./ConfirmModal";
+import PostMediaLightbox from "./PostMediaLightbox";
 
 const CAPTION_LIMIT = 80;
 
@@ -38,7 +39,22 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
 
   const isOwner = userId === post.user_id;
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const caption = post.caption ?? "";
+
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFiredRef = useRef(false);
+
+  function startLongPress() {
+    longPressFiredRef.current = false;
+    longPressTimerRef.current = setTimeout(() => {
+      longPressFiredRef.current = true;
+      setLightboxOpen(true);
+    }, 450);
+  }
+  function cancelLongPress() {
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+  }
 
   async function handleDelete() {
     setDeleting(true);
@@ -52,9 +68,15 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
   }
 
   return (
-    <article className="mb-5 overflow-hidden rounded-3xl glass-card shadow-sm">
+    <article className="mb-4 border-b border-black/10 pb-4 dark:border-white/10">
       <div className="relative">
-        {post.media_type === "text" ? (
+        <div
+          onTouchStart={startLongPress}
+          onTouchEnd={cancelLongPress}
+          onTouchMove={cancelLongPress}
+          onContextMenu={(e) => { e.preventDefault(); setLightboxOpen(true); }}
+        >
+          {post.media_type === "text" ? (
           <div className="flex min-h-[220px] items-center bg-brand-gradient px-6 pb-8 pt-16">
             <p className="text-lg font-medium leading-relaxed text-white">
               <ReadMoreText
@@ -83,7 +105,8 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
             className="w-full object-cover"
             style={{ aspectRatio: post.width && post.height ? post.width / post.height : 4 / 5 }}
           />
-        )}
+          )}
+        </div>
 
         {/* Identity bar floats directly on the media instead of a separate
             header row above it — the media is the card, not a slot inside it. */}
@@ -153,6 +176,8 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
           onCancel={() => setConfirmingDelete(false)}
         />
       )}
+
+      {lightboxOpen && <PostMediaLightbox post={post} onClose={() => setLightboxOpen(false)} />}
     </article>
   );
 }

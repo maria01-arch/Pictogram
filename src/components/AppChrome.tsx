@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import AuthHeaderControl from "./AuthHeaderControl";
@@ -63,6 +64,27 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
     pathname !== "/profile/edit" &&
     pathname !== "/profile/account-health";
 
+  // Home-feed-only "full screen" effect: the header slides up out of the
+  // way on scroll-down and slides back in on scroll-up, like a lot of
+  // native feed apps do, instead of staying pinned the whole time.
+  const [headerHidden, setHeaderHidden] = useState(false);
+  const lastScrollY = useRef(0);
+
+  useEffect(() => {
+    lastScrollY.current = window.scrollY;
+    setHeaderHidden(false);
+    if (pathname !== "/") return;
+
+    function onScroll() {
+      const y = window.scrollY;
+      if (y > lastScrollY.current && y > 72) setHeaderHidden(true);
+      else if (y < lastScrollY.current) setHeaderHidden(false);
+      lastScrollY.current = y;
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [pathname]);
+
   if (isAuthPage || isChatThread || isProfilePage) {
     return <>{children}</>;
   }
@@ -71,7 +93,11 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <header className="safe-top sticky top-0 z-30 glass-card">
+      <header
+        className={`safe-top sticky top-0 z-30 glass-card transition-transform duration-300 ease-out ${
+          headerHidden ? "-translate-y-full" : "translate-y-0"
+        }`}
+      >
         <div className="mx-auto flex max-w-lg items-center justify-between px-4 py-3">
           {titledRoute ? (
             <h1 className="text-xl font-bold text-black dark:text-white">{titledRoute.title}</h1>

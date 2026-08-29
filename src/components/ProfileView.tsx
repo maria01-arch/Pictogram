@@ -30,6 +30,9 @@ export default function ProfileView({ username: rawUsername }: { username: strin
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [confirmingBlock, setConfirmingBlock] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [likeCount, setLikeCount] = useState(0);
 
   useEffect(() => {
     load();
@@ -56,6 +59,18 @@ export default function ProfileView({ username: rawUsername }: { username: strin
       .order("created_at", { ascending: false })
       .order("position", { foreignTable: "post_media", ascending: true });
     setPosts(postRows ?? []);
+
+    const postIds = (postRows ?? []).map((row) => row.id);
+    const [followerRes, followingRes, likesRes] = await Promise.all([
+      supabase.from("follows").select("*", { count: "exact", head: true }).eq("following_id", p.id).eq("status", "accepted"),
+      supabase.from("follows").select("*", { count: "exact", head: true }).eq("follower_id", p.id).eq("status", "accepted"),
+      postIds.length > 0
+        ? supabase.from("likes").select("*", { count: "exact", head: true }).in("post_id", postIds)
+        : Promise.resolve({ count: 0 }),
+    ]);
+    setFollowerCount(followerRes.count ?? 0);
+    setFollowingCount(followingRes.count ?? 0);
+    setLikeCount(likesRes.count ?? 0);
 
     const { count } = await supabase
       .from("stories")
@@ -186,6 +201,21 @@ export default function ProfileView({ username: rawUsername }: { username: strin
           </p>
         )}
         {profile.location && <p className="mt-1 text-xs text-ink-muted">📍 {profile.location}</p>}
+
+        <div className="mt-4 flex items-center gap-6">
+          <div className="flex flex-col items-center">
+            <span className="text-base font-bold">{followerCount}</span>
+            <span className="text-xs text-ink-muted">Fans</span>
+          </div>
+          <div className="flex flex-col items-center">
+            <span className="text-base font-bold">{followingCount}</span>
+            <span className="text-xs text-ink-muted">Following</span>
+          </div>
+          <div className="flex flex-col items-center">
+            <span className="text-base font-bold">{likeCount}</span>
+            <span className="text-xs text-ink-muted">Likes</span>
+          </div>
+        </div>
 
         {!isSelf && blocked.blockedMe && (
           <p className="mt-4 text-sm text-ink-muted">This profile isn't available.</p>
