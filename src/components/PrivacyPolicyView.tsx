@@ -2,27 +2,33 @@ export default function PrivacyPolicyView() {
   return (
     <div className="px-4 pb-16 pt-6">
       <h2 className="text-lg font-bold">Privacy Policy</h2>
-      <p className="mt-1 text-xs text-ink-muted">Last updated: [DATE]</p>
+      <p className="mt-1 text-xs text-ink-muted">Last updated: August 30, 2026</p>
 
       <div className="mt-3 rounded-xl2 bg-black/5 p-3 text-xs text-ink-muted dark:bg-white/10">
-        This is a draft template, not legal advice. Fill in the [bracketed] placeholders
-        and have it reviewed by a lawyer before you rely on it — requirements vary by
-        where your users are located (e.g. GDPR in the EU/UK, CCPA in California).
+        This policy was drafted by the developer, not a lawyer. It's a genuine, filled-in
+        policy rather than a placeholder template, but a legal review is still worth doing
+        before you rely on it in a dispute — requirements vary by where your users are
+        located (e.g. GDPR in the EU/UK, CCPA in California).
       </div>
 
       <div className="mt-6 space-y-6 text-sm leading-relaxed text-ink-muted">
         <section>
           <h3 className="text-sm font-semibold text-ink">Who we are</h3>
           <p className="mt-1">
-            [App name] (&ldquo;we&rdquo;, &ldquo;us&rdquo;) operates this app. Contact us at [contact email]
-            for any privacy questions or requests.
+            Pictogram (&ldquo;we&rdquo;, &ldquo;us&rdquo;) is operated by Xchordlabs LLC.
+            Contact us at{" "}
+            <a href="mailto:support@xchord.space" className="text-brand-from underline">
+              support@xchord.space
+            </a>{" "}
+            for any privacy questions or requests, including data access or deletion
+            requests.
           </p>
         </section>
 
         <section>
           <h3 className="text-sm font-semibold text-ink">Information we collect</h3>
           <ul className="mt-1 list-disc space-y-1 pl-5">
-            <li>Account info: email, username, password (hashed), profile photo, bio.</li>
+            <li>Account info: email, username, password (hashed), profile photo, bio, location, and age if you provide them.</li>
             <li>Content you post: photos, videos, and stories (stories are deleted automatically after 24 hours).</li>
             <li>Messages: direct message text and any images you send in chat.</li>
             <li>Dating profile (optional, 18+ only): a bio and your like/match activity. Confirming you are 18+ is required before this feature can be enabled and is recorded with a timestamp.</li>
@@ -43,20 +49,20 @@ export default function PrivacyPolicyView() {
         <section>
           <h3 className="text-sm font-semibold text-ink">Automated content moderation</h3>
           <p className="mt-1">
-            Photos and videos you upload are automatically scanned by an automated
-            moderation service (Sightengine) before appearing publicly, to detect
-            content that violates our community guidelines. Flagged content may be
-            removed and may result in an account strike.
+            We use automated tools (Sightengine) to help screen uploaded photos and videos
+            for content that violates our community guidelines before it appears publicly.
+            Flagged content may be removed and may result in an account strike, which you
+            can appeal in-app.
           </p>
         </section>
 
         <section>
           <h3 className="text-sm font-semibold text-ink">Who we share it with</h3>
           <ul className="mt-1 list-disc space-y-1 pl-5">
-            <li>[Supabase] — hosts our database, authentication, and file storage.</li>
-            <li>[OneSignal] — delivers push notifications.</li>
+            <li>Supabase — hosts our database, authentication, and file storage.</li>
+            <li>OneSignal — delivers push notifications.</li>
             <li>Sightengine — scans uploaded images/video for policy violations.</li>
-            <li>We do not sell your personal information.</li>
+            <li>We do not sell your personal information, and we don't share it with advertisers.</li>
           </ul>
         </section>
 
@@ -71,11 +77,17 @@ export default function PrivacyPolicyView() {
         </section>
 
         <section>
-          <h3 className="text-sm font-semibold text-ink">Your choices</h3>
+          <h3 className="text-sm font-semibold text-ink">Your rights and choices</h3>
           <p className="mt-1">
-            You can edit or delete your posts, stories, and messages, disable your dating
-            profile at any time, and request deletion of your account and associated data
-            by contacting [contact email].
+            You can edit or delete your posts, stories, and messages, and disable your
+            dating profile, at any time from within the app. Depending on where you live,
+            you may also have the right to request a copy of your data, ask us to correct
+            or delete it, or object to certain uses of it. To exercise any of these rights,
+            email{" "}
+            <a href="mailto:support@xchord.space" className="text-brand-from underline">
+              support@xchord.space
+            </a>{" "}
+            — we'll respond as promptly as we can as a small, solo-developer team.
           </p>
         </section>
 
