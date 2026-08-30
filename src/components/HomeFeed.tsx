@@ -50,7 +50,7 @@ export default function HomeFeed() {
 
     // .in() doesn't preserve the id order we asked for — re-sort to match
     // the ranking the RPC actually gave us.
-    const rank = new Map(ids.map((id: string, i: number) => [id, i]));
+    const rank = new Map<string, number>(ids.map((id: string, i: number) => [id, i]));
     const ordered = [...(data ?? [])].sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
 
     setPosts((prev) => (offset === 0 ? ordered : [...prev, ...ordered]));
