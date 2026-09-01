@@ -31,6 +31,8 @@ export interface Post {
   height: number | null;
   created_at: string;
   moderation_status: "pending" | "approved" | "flagged";
+  cover_focal_x: number;
+  cover_focal_y: number;
   profiles?: Pick<Profile, "username" | "avatar_url" | "is_verified">;
   post_media?: PostMedia[];
 }

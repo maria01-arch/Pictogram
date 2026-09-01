@@ -43,6 +43,17 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const caption = post.caption ?? "";
 
+  // Only videos get the max-4:5-frame treatment (spec calls this out for
+  // video specifically — a true 16:9 landscape IMAGE is still allowed to
+  // render at its full width). Anything landscape-leaning beyond a normal
+  // 4:5/1:1 shape gets letterboxed; anything taller than 4:5 gets cropped.
+  // Edited posts already have this baked into the file (native aspect ==
+  // chosen aspect), so this only actually changes anything for older or
+  // unedited video posts with arbitrary native aspects.
+  const nativeAspect = post.width && post.height ? post.width / post.height : 4 / 5;
+  const videoAspect = nativeAspect > 1.2 || nativeAspect < 0.8 ? 4 / 5 : nativeAspect;
+  const videoFit: "cover" | "contain" = nativeAspect > 1.2 ? "contain" : "cover";
+
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressFiredRef = useRef(false);
   const lastTapRef = useRef(0);
@@ -119,7 +130,8 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
           <TapToPlayVideo
             videoUrl={post.media_url!}
             thumbnailUrl={post.thumbnail_url}
-            aspectRatio={post.width && post.height ? post.width / post.height : 4 / 5}
+            aspectRatio={videoAspect}
+            fit={videoFit}
           />
         ) : (
           <img

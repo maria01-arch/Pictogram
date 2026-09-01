@@ -6,6 +6,7 @@ interface TapToPlayVideoProps {
   videoUrl: string;
   thumbnailUrl: string | null;
   aspectRatio?: number; // width / height, defaults to 4/5
+  fit?: "cover" | "contain"; // "contain" letterboxes instead of cropping
 }
 
 /**
@@ -17,6 +18,7 @@ export default function TapToPlayVideo({
   videoUrl,
   thumbnailUrl,
   aspectRatio = 4 / 5,
+  fit = "cover",
 }: TapToPlayVideoProps) {
   const [activated, setActivated] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -56,7 +58,7 @@ export default function TapToPlayVideo({
           src={thumbnailUrl}
           alt=""
           aria-hidden
-          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
+          className={`absolute inset-0 h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"} transition-opacity duration-300 ${
             playing ? "opacity-0" : "opacity-100"
           }`}
         />
@@ -68,7 +70,7 @@ export default function TapToPlayVideo({
           src={videoUrl}
           preload="none"
           playsInline
-          className="absolute inset-0 h-full w-full object-cover"
+          className={`absolute inset-0 h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"}`}
           onCanPlay={(e) => e.currentTarget.play()}
           onPause={() => setPlaying(false)}
           onPlay={() => setPlaying(true)}

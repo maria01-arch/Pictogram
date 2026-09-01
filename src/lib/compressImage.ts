@@ -16,6 +16,17 @@ export interface CompressedImageResult {
   height: number;
 }
 
+// Normalized (0-1) crop rectangle relative to the SOURCE image's own
+// dimensions — e.g. { x: 0.1, y: 0, width: 0.8, height: 1 } crops 10% off
+// each side. Used to bake a real aspect-ratio crop into the compressed
+// file itself, instead of relying on CSS to fake it at render time.
+export interface CropRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 function loadImage(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -34,13 +45,18 @@ function loadImage(file: File): Promise<HTMLImageElement> {
 
 export async function compressImage(
   input: File,
-  { maxWidth = MAX_WIDTH, quality = QUALITY }: { maxWidth?: number; quality?: number } = {}
+  { maxWidth = MAX_WIDTH, quality = QUALITY, crop }: { maxWidth?: number; quality?: number; crop?: CropRect } = {}
 ): Promise<CompressedImageResult> {
   const img = await loadImage(input);
 
-  const scale = Math.min(1, maxWidth / img.naturalWidth);
-  const targetWidth = Math.round(img.naturalWidth * scale);
-  const targetHeight = Math.round(img.naturalHeight * scale);
+  const sourceX = crop ? crop.x * img.naturalWidth : 0;
+  const sourceY = crop ? crop.y * img.naturalHeight : 0;
+  const sourceWidth = crop ? crop.width * img.naturalWidth : img.naturalWidth;
+  const sourceHeight = crop ? crop.height * img.naturalHeight : img.naturalHeight;
+
+  const scale = Math.min(1, maxWidth / sourceWidth);
+  const targetWidth = Math.round(sourceWidth * scale);
+  const targetHeight = Math.round(sourceHeight * scale);
 
   const canvas = document.createElement("canvas");
   canvas.width = targetWidth;
@@ -49,7 +65,7 @@ export async function compressImage(
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas 2D context unavailable");
 
-  ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+  ctx.drawImage(img, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, targetWidth, targetHeight);
 
   const blob: Blob = await new Promise((resolve, reject) => {
     canvas.toBlob(

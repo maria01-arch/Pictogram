@@ -25,6 +25,15 @@ export interface CompressedVideoResult {
   durationSeconds: number;
 }
 
+// Same normalized crop concept as compressImage's CropRect — relative to
+// the source video's own pixel dimensions.
+export interface CropRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 function pickMimeType(): string {
   const candidates = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
   for (const type of candidates) {
@@ -33,7 +42,7 @@ function pickMimeType(): string {
   throw new Error("No supported video recording format on this device");
 }
 
-export async function compressVideo(input: File): Promise<CompressedVideoResult> {
+export async function compressVideo(input: File, crop?: CropRect): Promise<CompressedVideoResult> {
   const sourceUrl = URL.createObjectURL(input);
   const video = document.createElement("video");
   video.src = sourceUrl;
@@ -46,9 +55,15 @@ export async function compressVideo(input: File): Promise<CompressedVideoResult>
   });
 
   const duration = Math.min(video.duration, MAX_DURATION_SECONDS);
-  const scale = Math.min(1, MAX_WIDTH / video.videoWidth);
-  const width = Math.round(video.videoWidth * scale);
-  const height = Math.round(video.videoHeight * scale);
+
+  const sourceX = crop ? crop.x * video.videoWidth : 0;
+  const sourceY = crop ? crop.y * video.videoHeight : 0;
+  const sourceWidth = crop ? crop.width * video.videoWidth : video.videoWidth;
+  const sourceHeight = crop ? crop.height * video.videoHeight : video.videoHeight;
+
+  const scale = Math.min(1, MAX_WIDTH / sourceWidth);
+  const width = Math.round(sourceWidth * scale);
+  const height = Math.round(sourceHeight * scale);
 
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -84,7 +99,7 @@ export async function compressVideo(input: File): Promise<CompressedVideoResult>
         resolve();
         return;
       }
-      ctx.drawImage(video, 0, 0, width, height);
+      ctx.drawImage(video, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, width, height);
       requestAnimationFrame(draw);
     };
     draw();
@@ -102,8 +117,11 @@ export async function compressVideo(input: File): Promise<CompressedVideoResult>
 /**
  * Grabs a single frame (as a JPEG blob) to use as the Tap-to-Play thumbnail —
  * this is the ONLY thing loaded automatically for a video post/story.
+ * `atSeconds`, when given, seeks there first — used by the cover-frame
+ * picker so creators can choose a specific frame instead of always getting
+ * the very start of the clip.
  */
-export async function extractThumbnail(input: File): Promise<Blob> {
+export async function extractThumbnail(input: File, atSeconds?: number): Promise<Blob> {
   const sourceUrl = URL.createObjectURL(input);
   const video = document.createElement("video");
   video.src = sourceUrl;
@@ -114,7 +132,7 @@ export async function extractThumbnail(input: File): Promise<Blob> {
     video.onerror = () => reject(new Error("Could not load video for thumbnail"));
   });
 
-  video.currentTime = Math.min(0.3, video.duration / 2);
+  video.currentTime = atSeconds ?? Math.min(0.3, video.duration / 2);
   await new Promise((resolve) => (video.onseeked = resolve));
 
   const canvas = document.createElement("canvas");

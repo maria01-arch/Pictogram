@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { uploadPost, uploadStory, uploadCarouselPost, type UploadStage } from "@/lib/uploadMedia";
 import { uploadTextPost, uploadTextStory, wordCount, MIN_TEXT_POST_WORDS } from "@/lib/uploadText";
 import { getErrorMessage } from "@/lib/errorMessage";
+import PostMediaEditor, { type MediaEditorResult } from "./PostMediaEditor";
 
 const STAGE_LABEL: Record<UploadStage, string> = {
   compressing: "Compressing your media…",
@@ -26,6 +27,11 @@ export default function CreatePostForm() {
   const [stage, setStage] = useState<UploadStage | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Single image/video posts (not stories, not carousels) get a crop/aspect
+  // editing step between picking the file and writing a caption.
+  const [showEditor, setShowEditor] = useState(false);
+  const [editResult, setEditResult] = useState<MediaEditorResult | null>(null);
+
   useEffect(() => {
     return () => {
       previewUrls.forEach((url) => URL.revokeObjectURL(url));
@@ -36,6 +42,7 @@ export default function CreatePostForm() {
     const selected = Array.from(e.target.files ?? []);
     if (selected.length === 0) return;
     setError(null);
+    setEditResult(null);
 
     previewUrls.forEach((url) => URL.revokeObjectURL(url));
 
@@ -48,6 +55,11 @@ export default function CreatePostForm() {
 
     setFiles(selected);
     setPreviewUrls(selected.map((f) => URL.createObjectURL(f)));
+
+    // Editor only applies to a single-file post — not a carousel, not a story.
+    if (selected.length === 1 && mode === "post") {
+      setShowEditor(true);
+    }
   }
 
   function removeFileAt(index: number) {
@@ -75,7 +87,7 @@ export default function CreatePostForm() {
       if (mode === "post" && files.length > 1) {
         await uploadCarouselPost({ files, caption, onProgress: setStage });
       } else if (mode === "post") {
-        await uploadPost({ file: files[0], caption, onProgress: setStage });
+        await uploadPost({ file: files[0], caption, edit: editResult ?? undefined, onProgress: setStage });
       } else {
         await uploadStory({ file: files[0], onProgress: setStage });
       }
@@ -91,6 +103,20 @@ export default function CreatePostForm() {
   const words = wordCount(textBody);
   const textTooShort = mode === "post" && words < MIN_TEXT_POST_WORDS;
   const canSubmit = contentType === "text" ? textBody.trim().length > 0 && !textTooShort : files.length > 0;
+
+  if (showEditor && files.length === 1) {
+    return (
+      <div className="px-4 pt-4 pb-8">
+        <PostMediaEditor
+          file={files[0]}
+          onDone={(result) => {
+            setEditResult(result);
+            setShowEditor(false);
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="px-4 pt-4 pb-8">
@@ -150,18 +176,38 @@ export default function CreatePostForm() {
               </div>
             </button>
           ) : previewUrls.length === 1 ? (
-            <div className="relative overflow-hidden rounded-xl2" style={{ aspectRatio: 4 / 5 }}>
+            <div className="relative overflow-hidden rounded-xl2" style={{ aspectRatio: editResult ? undefined : 4 / 5 }}>
               {isVideo ? (
-                <video src={previewUrls[0]} className="h-full w-full object-cover" muted playsInline controls />
+                <video
+                  src={previewUrls[0]}
+                  className="h-full w-full object-cover"
+                  style={editResult ? { objectPosition: `${editResult.focalX * 100}% ${editResult.focalY * 100}%` } : undefined}
+                  muted
+                  playsInline
+                  controls
+                />
               ) : (
-                <img src={previewUrls[0]} alt="Selected media" className="h-full w-full object-cover" />
+                <img
+                  src={previewUrls[0]}
+                  alt="Selected media"
+                  className="h-full w-full object-cover"
+                  style={editResult ? { objectPosition: `${editResult.focalX * 100}% ${editResult.focalY * 100}%` } : undefined}
+                />
               )}
               <button
-                onClick={() => { setFiles([]); setPreviewUrls([]); }}
+                onClick={() => { setFiles([]); setPreviewUrls([]); setEditResult(null); }}
                 className="absolute right-2 top-2 rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold text-white"
               >
                 Change
               </button>
+              {mode === "post" && (
+                <button
+                  onClick={() => setShowEditor(true)}
+                  className="absolute left-2 top-2 rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold text-white"
+                >
+                  {editResult ? "Edit crop" : "Crop & aspect"}
+                </button>
+              )}
             </div>
           ) : (
             <div>
