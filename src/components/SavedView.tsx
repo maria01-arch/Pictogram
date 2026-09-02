@@ -60,7 +60,7 @@ export default function SavedView() {
           <p className="text-sm">Tap the bookmark icon on a post to save it here.</p>
         </div>
       ) : (
-        <div className="px-3 pt-3">
+        <div className="pt-3">
           {posts.map((post) => (
             <PostCard key={post.id} post={post} onDeleted={(id) => setPosts((prev) => prev.filter((p) => p.id !== id))} />
           ))}

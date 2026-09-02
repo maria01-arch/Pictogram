@@ -92,7 +92,7 @@ export default function HomeFeed() {
           <p className="text-sm">Follow a few creators or post something to get your feed going.</p>
         </div>
       ) : (
-        <div className="px-3 pt-3">
+        <div className="pt-3">
           {posts.map((post) => (
             <PostCard key={post.id} post={post} onDeleted={(id) => setPosts((prev) => prev.filter((p) => p.id !== id))} />
           ))}
@@ -108,9 +108,9 @@ export default function HomeFeed() {
 
 function FeedSkeleton() {
   return (
-    <div className="px-3 pt-3">
+    <div className="pt-3">
       {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="mb-4 animate-pulse overflow-hidden rounded-xl2 glass-card">
+        <div key={i} className="mb-4 animate-pulse overflow-hidden glass-card">
           <div className="flex items-center gap-3 px-4 py-3">
             <div className="h-9 w-9 rounded-full bg-black/10 dark:bg-white/10" />
             <div className="h-3 w-24 rounded bg-black/10 dark:bg-white/10" />

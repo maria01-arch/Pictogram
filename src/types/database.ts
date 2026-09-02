@@ -157,6 +157,13 @@ export interface MessageReaction {
   created_at: string;
 }
 
+export interface CommentReaction {
+  comment_id: string;
+  user_id: string;
+  emoji: string;
+  created_at: string;
+}
+
 export interface BlockedUser {
   blocker_id: string;
   blocked_id: string;
