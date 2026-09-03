@@ -93,6 +93,9 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
   }
 
   const titledRoute = TITLED_ROUTES.find((r) => pathname?.startsWith(r.prefix));
+  // Menu is a drill-in hub reached via the header's hamburger icon, not a
+  // primary tab destination — it shouldn't also show the bottom tab bar.
+  const hideBottomNav = pathname === "/menu";
 
   return (
     <>
@@ -116,6 +119,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
 
       <main className="mx-auto max-w-lg pb-16">{children}</main>
 
+      {!hideBottomNav && (
       <nav className="safe-bottom fixed bottom-0 left-0 right-0 z-30 glass-card">
         <div className="mx-auto flex max-w-lg items-center justify-around py-2">
           {NAV_ITEMS.map((item) => {
@@ -149,6 +153,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
           })}
         </div>
       </nav>
+      )}
     </>
   );
 }

@@ -78,6 +78,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
   const { start, done } = useTopLoading();
   const [initialLoading, setInitialLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [otherProfile, setOtherProfile] = useState<Profile | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [reactions, setReactions] = useState<MessageReaction[]>([]);
@@ -192,8 +193,19 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     };
   }
 
+  const hasScrolledOnceRef = useRef(false);
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messages.length === 0) return;
+    // First load of a thread: jump straight to the bottom, no animation —
+    // a smooth scroll here can land short if images/avatars are still
+    // laying out, which is why reopening a chat needed a manual scroll.
+    // Only genuinely NEW messages after that get the smooth scroll.
+    if (!hasScrolledOnceRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "auto" });
+      hasScrolledOnceRef.current = true;
+    } else {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages.length]);
 
   function handleDraftChange(value: string) {
@@ -201,6 +213,12 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     if (!userId || !channelRef.current) return;
     channelRef.current.send({ type: "broadcast", event: "typing", payload: { userId } });
   }
+
+  useEffect(() => {
+    if (!textareaRef.current) return;
+    textareaRef.current.style.height = "auto";
+    textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+  }, [draft]);
 
   async function sendMessage() {
     const content = draft.trim();
@@ -357,7 +375,10 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
   const canMessage = !blocked.blockedByMe && !blocked.blockedMe;
 
   return (
-    <div className="flex flex-col" style={{ height: "var(--app-height, 100dvh)" }}>
+    <div
+      className="fixed inset-x-0 flex flex-col"
+      style={{ top: "var(--app-offset-top, 0px)", height: "var(--app-height, 100dvh)" }}
+    >
       <header className="safe-top flex shrink-0 items-center gap-2.5 border-b border-black/5 px-3 py-2 dark:border-white/5">
         <button onClick={() => router.back()} aria-label="Back" className="shrink-0">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -515,12 +536,19 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
             </div>
           )}
 
-          <input
+          <textarea
+            ref={textareaRef}
             value={draft}
             onChange={(e) => handleDraftChange(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+              }
+            }}
             placeholder="Message…"
-            className="flex-1 rounded-full bg-black/5 px-3.5 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-from dark:bg-white/10"
+            rows={1}
+            className="max-h-[120px] flex-1 resize-none rounded-2xl bg-black/5 px-3.5 py-2 text-sm leading-normal outline-none focus-visible:ring-2 focus-visible:ring-brand-from dark:bg-white/10"
           />
           <button
             onClick={sendMessage}
