@@ -46,9 +46,32 @@ export async function reviewApplication(
   status: "approved" | "rejected",
   reviewerNotes: string
 ) {
+  // Delete the doc files via the Storage API BEFORE updating status — this
+  // can't happen in a database trigger (Supabase blocks raw SQL deletes on
+  // storage.objects), so it has to happen here.
+  const { data: current, error: fetchDocsError } = await supabase
+    .from("verification_applications")
+    .select("id_document_url, tx_screenshot_url")
+    .eq("id", applicationId)
+    .single();
+  if (fetchDocsError) throw fetchDocsError;
+
+  const pathsToDelete = [current?.id_document_url, current?.tx_screenshot_url].filter(
+    (p): p is string => !!p
+  );
+  if (pathsToDelete.length > 0) {
+    const { error: removeError } = await supabase.storage.from("verification-docs").remove(pathsToDelete);
+    if (removeError) throw removeError;
+  }
+
   const { error } = await supabase
     .from("verification_applications")
-    .update({ status, reviewer_notes: reviewerNotes || null })
+    .update({
+      status,
+      reviewer_notes: reviewerNotes || null,
+      id_document_url: null,
+      tx_screenshot_url: null,
+    })
     .eq("id", applicationId);
   if (error) throw error;
 
