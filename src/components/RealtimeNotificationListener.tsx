@@ -52,7 +52,7 @@ export default function RealtimeNotificationListener() {
                 .single();
 
               const body = `${actor?.username ?? "Someone"} ${MESSAGES[notif.type] ?? "sent you an update"}`;
-              new Notification("Pictogram", { body });
+              new Notification("Next Social", { body });
             } catch {
               // Best-effort — never let a broken bridge crash the listener.
             }

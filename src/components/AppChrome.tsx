@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import AuthHeaderControl from "./AuthHeaderControl";
+import Logo from "./Logo";
 import { useBadgeCounts } from "@/lib/useBadgeCounts";
 
 const NAV_ITEMS = [
@@ -104,9 +105,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
           {titledRoute ? (
             <h1 className="text-xl font-bold text-black dark:text-white">{titledRoute.title}</h1>
           ) : (
-            <h1 className="bg-brand-gradient bg-clip-text text-xl font-bold text-transparent">
-              pictogram
-            </h1>
+            <Logo height={26} />
           )}
           <div className="flex items-center gap-1">
             {titledRoute ? <NotificationIcon count={notifications} /> : <SearchIcon />}

@@ -134,7 +134,7 @@ export default function ConversationList() {
     return (
       <div className="flex flex-col items-center gap-1 px-6 py-16 text-center text-ink-muted">
         <p className="font-semibold">No conversations yet</p>
-        <p className="text-sm">Message a friend or family member you've met on Pictogram.</p>
+        <p className="text-sm">Message a friend or family member you've met on Next Social.</p>
       </div>
     );
   }

@@ -52,7 +52,7 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
   return (
     <div className="mx-auto flex min-h-[70vh] max-w-sm flex-col justify-center px-6">
       <h1 className="bg-brand-gradient bg-clip-text text-3xl font-bold text-transparent">
-        pictogram
+        Next Social
       </h1>
       <p className="mt-1 text-sm text-ink-muted">
         {mode === "login" ? "Welcome back." : "Create your account."}

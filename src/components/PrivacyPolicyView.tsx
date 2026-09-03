@@ -15,7 +15,7 @@ export default function PrivacyPolicyView() {
         <section>
           <h3 className="text-sm font-semibold text-ink">Who we are</h3>
           <p className="mt-1">
-            Pictogram (&ldquo;we&rdquo;, &ldquo;us&rdquo;) is operated by Xchordlabs LLC.
+            Next Social (&ldquo;we&rdquo;, &ldquo;us&rdquo;) is operated by Xchordlabs LLC.
             Contact us at{" "}
             <a href="mailto:support@xchord.space" className="text-brand-from underline">
               support@xchord.space

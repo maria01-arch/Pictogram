@@ -19,7 +19,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Pictogram — Share Life",
+  title: "Next Social — Share Life",
   description: "A creator-first social platform. No shadowbans, no bloat.",
   manifest: "/manifest.json",
 };

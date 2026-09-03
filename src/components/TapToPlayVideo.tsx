@@ -85,7 +85,7 @@ export default function TapToPlayVideo({
 
 /**
  * Signature interaction element: a segmented iris/aperture button, echoing
- * the blades in the Pictogram logo mark, instead of a generic triangle.
+ * the blades in the app's original logo mark, instead of a generic triangle.
  * Blades rotate outward slightly on hover/tap to hint at "opening" the shot.
  */
 function AperturePlayButton() {
