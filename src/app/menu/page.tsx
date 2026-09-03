@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -85,6 +86,15 @@ const SECTIONS: { title: string; items: MenuItem[] }[] = [
 
 export default function MenuPage() {
   const router = useRouter();
+  const [profile, setProfile] = useState<{ username: string; avatar_url: string | null; display_name: string | null } | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return;
+      const { data } = await supabase.from("profiles").select("username, avatar_url, display_name").eq("id", user.id).single();
+      setProfile(data);
+    });
+  }, []);
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -95,6 +105,24 @@ export default function MenuPage() {
   return (
     <div className="px-4 pb-10 pt-4">
       <h2 className="text-lg font-bold">Menu</h2>
+
+      {profile && (
+        <Link
+          href={`/profile/${profile.username}`}
+          className="mt-4 flex items-center gap-4 rounded-xl2 glass-card p-4 transition hover:bg-black/5 dark:hover:bg-white/5"
+        >
+          <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full bg-brand-gradient">
+            {profile.avatar_url && <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-lg font-bold">{profile.display_name || profile.username}</p>
+            <p className="text-sm text-ink-muted">@{profile.username} · View your profile</p>
+          </div>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-ink-muted">
+            <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </Link>
+      )}
 
       {SECTIONS.map((section) => (
         <div key={section.title} className="mt-5">

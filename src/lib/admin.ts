@@ -53,13 +53,17 @@ export async function reviewApplication(
   if (error) throw error;
 
   if (status === "approved") {
-    const { data: application } = await supabase
+    const { data: application, error: fetchError } = await supabase
       .from("verification_applications")
       .select("user_id")
       .eq("id", applicationId)
       .single();
-    if (application) {
-      await supabase.from("profiles").update({ is_verified: true }).eq("id", application.user_id);
-    }
+    if (fetchError) throw fetchError;
+
+    const { error: verifyError } = await supabase
+      .from("profiles")
+      .update({ is_verified: true })
+      .eq("id", application.user_id);
+    if (verifyError) throw verifyError;
   }
 }

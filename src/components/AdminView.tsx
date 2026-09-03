@@ -31,6 +31,7 @@ export default function AdminView() {
   const [reviewed, setReviewed] = useState<PendingApplication[]>([]);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     checkIsAdmin().then((isAdmin) => {
@@ -51,9 +52,13 @@ export default function AdminView() {
 
   async function handleReview(id: string, status: "approved" | "rejected") {
     setBusyId(id);
+    setError(null);
     try {
       await reviewApplication(id, status, notes[id] ?? "");
       await loadAll();
+    } catch (err) {
+      console.error("Review failed:", err);
+      setError(err instanceof Error ? err.message : "Something went wrong — please try again.");
     } finally {
       setBusyId(null);
     }
@@ -66,6 +71,10 @@ export default function AdminView() {
   return (
     <div className="mx-auto max-w-lg px-4 pb-16 pt-6">
       <h1 className="text-lg font-bold">Verification review</h1>
+
+      {error && (
+        <div className="mt-3 rounded-xl2 bg-red-500/10 p-3 text-sm text-red-500">{error}</div>
+      )}
 
       <div className="mt-4 flex gap-2">
         <button
