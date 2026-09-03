@@ -32,6 +32,7 @@ export default function AdminView() {
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [debugStatus, setDebugStatus] = useState<string>("(no action taken yet)");
 
   useEffect(() => {
     checkIsAdmin().then((isAdmin) => {
@@ -51,14 +52,19 @@ export default function AdminView() {
   }
 
   async function handleReview(id: string, status: "approved" | "rejected") {
+    setDebugStatus(`Tapped "${status}" for application ${id.slice(0, 8)}… starting…`);
     setBusyId(id);
     setError(null);
     try {
       await reviewApplication(id, status, notes[id] ?? "");
+      setDebugStatus(`✅ Success — marked ${status}. Refreshing list…`);
       await loadAll();
+      setDebugStatus(`✅ Done — ${status}, list refreshed.`);
     } catch (err) {
       console.error("Review failed:", err);
-      setError(err instanceof Error ? err.message : "Something went wrong — please try again.");
+      const message = err instanceof Error ? err.message : JSON.stringify(err);
+      setDebugStatus(`❌ Failed on "${status}": ${message}`);
+      setError(message);
     } finally {
       setBusyId(null);
     }
@@ -71,6 +77,10 @@ export default function AdminView() {
   return (
     <div className="mx-auto max-w-lg px-4 pb-16 pt-6">
       <h1 className="text-lg font-bold">Verification review</h1>
+
+      <div className="mt-3 rounded-xl2 border-2 border-dashed border-brand-from/40 bg-brand-from/5 p-3 font-mono text-xs">
+        <span className="font-semibold">Debug status:</span> {debugStatus}
+      </div>
 
       {error && (
         <div className="mt-3 rounded-xl2 bg-red-500/10 p-3 text-sm text-red-500">{error}</div>
