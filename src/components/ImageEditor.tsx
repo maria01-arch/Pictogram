@@ -51,6 +51,10 @@ export default function ImageEditor({
   const [sending, setSending] = useState(false);
   const currentStrokeRef = useRef<Stroke | null>(null);
 
+  useEffect(() => {
+    currentStrokeRef.current = null;
+  }, [tool]);
+
   // Canvas pixel dims for the current rotation.
   const [dims, setDims] = useState({ w: 0, h: 0 });
 
@@ -87,27 +91,35 @@ export default function ImageEditor({
     ctx.drawImage(img, -dims.w / 2, -dims.h / 2, dims.w, dims.h);
     ctx.restore();
 
-    for (const s of strokes) {
-      if (s.points.length < 2) continue;
-      ctx.strokeStyle = s.color;
-      ctx.lineWidth = s.width * w;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.beginPath();
-      ctx.moveTo(s.points[0].x * w, s.points[0].y * h);
-      for (const p of s.points.slice(1)) ctx.lineTo(p.x * w, p.y * h);
-      ctx.stroke();
-    }
+    try {
+      for (const s of strokes) {
+        if (!s || !s.points || s.points.length < 2) continue;
+        ctx.strokeStyle = s.color;
+        ctx.lineWidth = s.width * w;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        ctx.moveTo(s.points[0].x * w, s.points[0].y * h);
+        for (const p of s.points.slice(1)) ctx.lineTo(p.x * w, p.y * h);
+        ctx.stroke();
+      }
 
-    for (const t of textLayers) {
-      ctx.font = `700 ${Math.round(w * 0.055)}px sans-serif`;
-      ctx.fillStyle = t.color;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.lineWidth = w * 0.006;
-      ctx.strokeStyle = t.color === "#000000" ? "#FFFFFF" : "#000000";
-      ctx.strokeText(t.text, t.x * w, t.y * h);
-      ctx.fillText(t.text, t.x * w, t.y * h);
+      for (const t of textLayers) {
+        if (!t || !t.text) continue;
+        ctx.font = `700 ${Math.round(w * 0.055)}px sans-serif`;
+        ctx.fillStyle = t.color;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.lineWidth = w * 0.006;
+        ctx.strokeStyle = t.color === "#000000" ? "#FFFFFF" : "#000000";
+        ctx.strokeText(t.text, t.x * w, t.y * h);
+        ctx.fillText(t.text, t.x * w, t.y * h);
+      }
+    } catch (err) {
+      // A single bad frame shouldn't take down the whole editor — skip it
+      // and keep the base image visible instead of crashing to the
+      // top-level error boundary.
+      console.error("ImageEditor redraw skipped a bad frame:", err);
     }
   }, [ready, rotation, dims, strokes, textLayers]);
 
@@ -121,22 +133,21 @@ export default function ImageEditor({
   }
 
   function handleCanvasPointerDown(e: React.PointerEvent) {
-    if (tool !== "draw") return;
+    if (tool !== "draw" || currentStrokeRef.current) return; // already drawing with another finger
     const p = canvasPointFromEvent(e);
     currentStrokeRef.current = { points: [p], color, width: STROKE_WIDTHS[widthIdx] };
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   }
   function handleCanvasPointerMove(e: React.PointerEvent) {
-    if (tool !== "draw" || !currentStrokeRef.current) return;
-    currentStrokeRef.current.points.push(canvasPointFromEvent(e));
+    const s = currentStrokeRef.current;
+    if (tool !== "draw" || !s) return;
+    s.points.push(canvasPointFromEvent(e));
     // Live-preview the in-progress stroke directly for responsiveness;
     // the full strokes array (and this segment) gets committed on pointer up.
     const canvas = canvasRef.current;
     if (canvas) {
-      // Live-preview the in-progress stroke directly for responsiveness.
       const ctx = canvas.getContext("2d");
       if (ctx) {
-        const s = currentStrokeRef.current;
         const last2 = s.points.slice(-2);
         if (last2.length === 2) {
           ctx.strokeStyle = s.color;
@@ -152,9 +163,12 @@ export default function ImageEditor({
     }
   }
   function handleCanvasPointerUp() {
-    if (tool !== "draw" || !currentStrokeRef.current) return;
-    setStrokes((prev) => [...prev, currentStrokeRef.current!]);
+    const s = currentStrokeRef.current;
     currentStrokeRef.current = null;
+    if (tool !== "draw" || !s) return;
+    // Drop taps that never actually dragged — a 1-point "stroke" has
+    // nothing to render and isn't worth keeping around.
+    if (s.points.length >= 2) setStrokes((prev) => [...prev, s]);
   }
 
   function handleCanvasTap(e: React.PointerEvent) {
