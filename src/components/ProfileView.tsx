@@ -14,6 +14,9 @@ import ReadMoreText from "./ReadMoreText";
 import ConfirmModal from "./ConfirmModal";
 import { useTopLoading } from "./TopLoadingBar";
 import { ProfileSkeleton } from "./Skeleton";
+import AvatarActionSheet from "./AvatarActionSheet";
+import StoryViewer from "./StoryViewer";
+import type { Story } from "@/types/database";
 
 export default function ProfileView({ username: rawUsername }: { username: string }) {
   const username = rawUsername.trim();
@@ -21,7 +24,11 @@ export default function ProfileView({ username: rawUsername }: { username: strin
   const { start, done } = useTopLoading();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
-  const [hasActiveStory, setHasActiveStory] = useState(false);
+  const [activeStories, setActiveStories] = useState<Story[]>([]);
+  const hasActiveStory = activeStories.length > 0;
+  const [avatarSheetOpen, setAvatarSheetOpen] = useState(false);
+  const [viewingPhoto, setViewingPhoto] = useState(false);
+  const [viewingStatus, setViewingStatus] = useState(false);
   const [relation, setRelation] = useState<FollowRelation>("none");
   const [isSelf, setIsSelf] = useState(false);
   const [blocked, setBlocked] = useState({ blockedByMe: false, blockedMe: false });
@@ -72,12 +79,13 @@ export default function ProfileView({ username: rawUsername }: { username: strin
     setFollowingCount(followingRes.count ?? 0);
     setLikeCount(likesRes.count ?? 0);
 
-    const { count } = await supabase
+    const { data: storyRows } = await supabase
       .from("stories")
-      .select("*", { count: "exact", head: true })
+      .select("*")
       .eq("user_id", p.id)
-      .gt("expires_at", new Date().toISOString());
-    setHasActiveStory((count ?? 0) > 0);
+      .gt("expires_at", new Date().toISOString())
+      .order("created_at", { ascending: true });
+    setActiveStories(storyRows ?? []);
 
     if (user && user.id !== p.id) {
       setRelation(await getFollowRelation(p.id));
@@ -187,11 +195,15 @@ export default function ProfileView({ username: rawUsername }: { username: strin
           </div>
         )}
 
-        <div className={hasActiveStory ? "rounded-full bg-brand-gradient p-0.5" : ""}>
+        <button
+          onClick={() => setAvatarSheetOpen(true)}
+          aria-label="Profile picture options"
+          className={hasActiveStory ? "rounded-full bg-brand-gradient p-0.5" : ""}
+        >
           <div className="h-24 w-24 overflow-hidden rounded-full border-2 border-surface-lightMuted bg-brand-gradient dark:border-surface-darkMuted">
             {profile.avatar_url && <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />}
           </div>
-        </div>
+        </button>
 
         <h2 className="mt-3 flex items-center gap-1.5 text-lg font-bold">{profile.display_name ?? profile.username}{profile.is_verified && <VerifiedBadge size={16} />}</h2>
         <p className="text-sm text-ink-muted">@{profile.username}</p>
@@ -293,6 +305,33 @@ export default function ProfileView({ username: rawUsername }: { username: strin
           danger
           onConfirm={() => { setConfirmingBlock(false); handleBlock(); }}
           onCancel={() => setConfirmingBlock(false)}
+        />
+      )}
+
+      {avatarSheetOpen && (
+        <AvatarActionSheet
+          hasStory={hasActiveStory}
+          onViewPhoto={() => { setAvatarSheetOpen(false); setViewingPhoto(true); }}
+          onViewStatus={() => { setAvatarSheetOpen(false); setViewingStatus(true); }}
+          onClose={() => setAvatarSheetOpen(false)}
+        />
+      )}
+
+      {viewingPhoto && profile.avatar_url && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90"
+          onClick={() => setViewingPhoto(false)}
+        >
+          <img src={profile.avatar_url} alt="" className="max-h-[85vh] max-w-[92vw] object-contain" />
+          <button onClick={() => setViewingPhoto(false)} className="absolute right-4 top-5 text-white">✕</button>
+        </div>
+      )}
+
+      {viewingStatus && activeStories.length > 0 && (
+        <StoryViewer
+          stories={activeStories}
+          username={profile.display_name ?? profile.username}
+          onClose={() => setViewingStatus(false)}
         />
       )}
     </div>

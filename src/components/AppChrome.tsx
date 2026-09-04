@@ -108,7 +108,12 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
           {titledRoute ? (
             <h1 className="text-xl font-bold text-black dark:text-white">{titledRoute.title}</h1>
           ) : (
-            <Logo height={26} />
+            <div className="flex items-center gap-2">
+              <Logo height={26} />
+              <span className="text-base font-bold tracking-tight text-black dark:text-white">
+                Next Social
+              </span>
+            </div>
           )}
           <div className="flex items-center gap-1">
             {titledRoute ? <NotificationIcon count={notifications} /> : <SearchIcon />}
