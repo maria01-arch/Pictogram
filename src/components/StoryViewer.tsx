@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Story } from "@/types/database";
+import Portal from "./Portal";
+import { useScrollLock } from "@/lib/useScrollLock";
 
 // How long a press has to be held before it counts as "hold to pause"
 // instead of a tap-to-navigate. Below this, releasing navigates; at or
@@ -25,6 +27,7 @@ export default function StoryViewer({
   const [holding, setHolding] = useState(false);
   const [progress, setProgress] = useState(0); // 0-1 fill for the current segment
   const current = stories[index];
+  useScrollLock();
 
   const videoRef = useRef<HTMLVideoElement>(null);
   // Time already spent on the current story before the most recent resume.
@@ -128,8 +131,10 @@ export default function StoryViewer({
   }
 
   return (
+    <Portal>
     <div
       className="fixed inset-0 z-50 select-none bg-black touch-none [-webkit-touch-callout:none]"
+      style={{ height: "100dvh" }}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerCancel}
@@ -173,5 +178,6 @@ export default function StoryViewer({
         <img src={current.media_url ?? undefined} alt="" draggable={false} className="h-full w-full select-none object-contain [-webkit-touch-callout:none]" />
       )}
     </div>
+    </Portal>
   );
 }
