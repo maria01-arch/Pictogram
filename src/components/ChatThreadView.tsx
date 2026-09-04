@@ -10,6 +10,8 @@ import { createNotification } from "@/lib/notifications";
 import { markConversationRead } from "@/lib/badgeCounts";
 import { uploadChatImage, resolveChatMediaUrl } from "../lib/uploadChatImage";
 import ConfirmModal from "./ConfirmModal";
+import ImageEditor from "./ImageEditor";
+import Portal from "./Portal";
 import VerifiedBadge from "./VerifiedBadge";
 import EmojiText from "./EmojiText";
 import { useTopLoading } from "./TopLoadingBar";
@@ -92,6 +94,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
   const [blocked, setBlocked] = useState({ blockedByMe: false, blockedMe: false });
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [editingImageFile, setEditingImageFile] = useState<File | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -275,10 +278,17 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     }
   }
 
-  async function handleImageSelected(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleImageSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     setAttachMenuOpen(false);
     if (!file || !userId) return;
+    setEditingImageFile(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  async function sendEditedImage({ file, caption }: { file: File; caption: string }) {
+    setEditingImageFile(null);
+    if (!userId) return;
 
     setUploadingImage(true);
     try {
@@ -286,14 +296,13 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
       await supabase.from("messages").insert({
         conversation_id: conversationId,
         sender_id: userId,
-        content: null,
+        content: caption || null,
         media_url: mediaUrl,
       });
     } catch {
       alert("Failed to send image. Try again.");
     } finally {
       setUploadingImage(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
 
@@ -436,6 +445,15 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
                   className="max-w-[65%] overflow-hidden rounded-2xl border border-black/10 dark:border-white/15"
                 >
                   <ChatImage path={m.media_url} onTap={handleImageTap} />
+                  {m.content && (
+                    <p
+                      className={`break-words px-3 py-2 text-[15px] leading-snug ${
+                        mine ? "bg-brand-gradient text-white" : "bg-black/5 dark:bg-white/10"
+                      }`}
+                    >
+                      {m.content}
+                    </p>
+                  )}
                 </div>
               ) : m.content && isSingleEmoji(m.content) && !quote ? (
                 <div
@@ -590,10 +608,20 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
       )}
 
       {lightboxUrl && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90" onClick={() => setLightboxUrl(null)}>
-          <img src={lightboxUrl} alt="" className="max-h-[85vh] max-w-[92vw] object-contain" />
-          <button onClick={() => setLightboxUrl(null)} className="absolute right-4 top-5 text-white">✕</button>
-        </div>
+        <Portal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90" style={{ height: "100dvh" }} onClick={() => setLightboxUrl(null)}>
+            <img src={lightboxUrl} alt="" className="max-h-[85vh] max-w-[92vw] object-contain" />
+            <button onClick={() => setLightboxUrl(null)} className="absolute right-4 top-5 text-white">✕</button>
+          </div>
+        </Portal>
+      )}
+
+      {editingImageFile && (
+        <ImageEditor
+          file={editingImageFile}
+          onCancel={() => setEditingImageFile(null)}
+          onSend={sendEditedImage}
+        />
       )}
 
       {confirmingDeleteMessage && (
