@@ -91,8 +91,16 @@ export default function StoryViewer({
     videoRef.current?.play().catch(() => {});
   }
 
-  function handlePointerDown() {
+  function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
     wasHoldRef.current = false;
+    // Claim the pointer so a still-held finger keeps reporting to this
+    // element even if the browser would otherwise hand it off (e.g. to
+    // start its own long-press gesture).
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // Unsupported / already released — safe to ignore.
+    }
     holdTimerRef.current = setTimeout(() => {
       wasHoldRef.current = true;
       pause();
@@ -121,11 +129,12 @@ export default function StoryViewer({
 
   return (
     <div
-      className="fixed inset-0 z-50 select-none bg-black touch-none"
+      className="fixed inset-0 z-50 select-none bg-black touch-none [-webkit-touch-callout:none]"
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerCancel}
       onPointerCancel={handlePointerCancel}
+      onContextMenu={(e) => e.preventDefault()}
     >
       <div className="absolute left-2 right-2 top-2 z-10 flex gap-1">
         {stories.map((_, i) => (
@@ -161,7 +170,7 @@ export default function StoryViewer({
           className="h-full w-full object-contain"
         />
       ) : (
-        <img src={current.media_url ?? undefined} alt="" className="h-full w-full object-contain" />
+        <img src={current.media_url ?? undefined} alt="" draggable={false} className="h-full w-full select-none object-contain [-webkit-touch-callout:none]" />
       )}
     </div>
   );

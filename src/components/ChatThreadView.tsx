@@ -540,27 +540,6 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
             ref={textareaRef}
             value={draft}
             onChange={(e) => handleDraftChange(e.target.value)}
-            onKeyDown={(e) => {
-              // isComposing guards IME text composition (e.g. typing accented
-              // characters or CJK input) where Enter confirms a candidate
-              // instead of submitting.
-              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                sendMessage();
-              }
-            }}
-            onBeforeInput={(e) => {
-              // Many Android soft keyboards (Gboard, Samsung Keyboard) and
-              // WebView wrappers never fire a proper keydown for Enter on a
-              // <textarea> — they fire a beforeinput with inputType
-              // "insertLineBreak" instead, which the handler above can't see.
-              // That's what made Enter insert a newline instead of sending.
-              const inputType = (e.nativeEvent as InputEvent).inputType;
-              if (inputType === "insertLineBreak") {
-                e.preventDefault();
-                sendMessage();
-              }
-            }}
             placeholder="Message…"
             rows={1}
             className="max-h-[120px] flex-1 resize-none rounded-2xl bg-black/5 px-3.5 py-2 text-sm leading-normal outline-none focus-visible:ring-2 focus-visible:ring-brand-from dark:bg-white/10"
