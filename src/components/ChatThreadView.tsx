@@ -9,6 +9,9 @@ import { getBlockStatus } from "@/lib/block";
 import { createNotification } from "@/lib/notifications";
 import { markConversationRead } from "@/lib/badgeCounts";
 import { uploadChatImage, resolveChatMediaUrl } from "../lib/uploadChatImage";
+import { uploadChatVoice, isVoiceNotePath } from "@/lib/uploadChatVoice";
+import VoiceRecordBar from "./VoiceRecordBar";
+import ChatVoiceNote from "./ChatVoiceNote";
 import ConfirmModal from "./ConfirmModal";
 import ImageEditor from "./ImageEditor";
 import Portal from "./Portal";
@@ -95,6 +98,8 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [editingImageFile, setEditingImageFile] = useState<File | null>(null);
+  const [recordingVoice, setRecordingVoice] = useState(false);
+  const [uploadingVoice, setUploadingVoice] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -306,6 +311,26 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     }
   }
 
+  async function sendVoiceNote(blob: Blob, mimeType: string) {
+    setRecordingVoice(false);
+    if (!userId) return;
+
+    setUploadingVoice(true);
+    try {
+      const mediaUrl = await uploadChatVoice(blob, mimeType);
+      await supabase.from("messages").insert({
+        conversation_id: conversationId,
+        sender_id: userId,
+        content: null,
+        media_url: mediaUrl,
+      });
+    } catch {
+      alert("Failed to send voice note. Try again.");
+    } finally {
+      setUploadingVoice(false);
+    }
+  }
+
   function startLongPress(message: Message, x: number, y: number) {
     longPressFiredRef.current = false;
     longPressTimerRef.current = setTimeout(() => {
@@ -436,7 +461,16 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
 
           return (
             <div key={m.id} className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
-              {m.media_url ? (
+              {m.media_url && isVoiceNotePath(m.media_url) ? (
+                <div
+                  onTouchStart={(e) => startLongPress(m, e.touches[0].clientX, e.touches[0].clientY)}
+                  onTouchEnd={cancelLongPress}
+                  onTouchMove={cancelLongPress}
+                  onContextMenu={(e) => { e.preventDefault(); setMenu({ message: m, x: e.clientX, y: e.clientY }); }}
+                >
+                  <ChatVoiceNote path={m.media_url} mine={mine} />
+                </div>
+              ) : m.media_url ? (
                 <div
                   onTouchStart={(e) => startLongPress(m, e.touches[0].clientX, e.touches[0].clientY)}
                   onTouchEnd={cancelLongPress}
@@ -518,6 +552,9 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
       {uploadingImage && (
         <div className="border-t border-black/5 px-3 py-1.5 text-xs text-ink-muted dark:border-white/5">Sending image…</div>
       )}
+      {uploadingVoice && (
+        <div className="border-t border-black/5 px-3 py-1.5 text-xs text-ink-muted dark:border-white/5">Sending voice note…</div>
+      )}
 
       {!canMessage ? (
         <div className="shrink-0 border-t border-black/5 px-3 py-3 text-center text-sm text-ink-muted dark:border-white/5">
@@ -527,6 +564,10 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
         <div className="relative flex shrink-0 items-center gap-2 border-t border-black/5 px-2.5 py-2 dark:border-white/5">
           <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelected} className="hidden" />
 
+          {recordingVoice ? (
+            <VoiceRecordBar onCancel={() => setRecordingVoice(false)} onSend={sendVoiceNote} />
+          ) : (
+            <>
           <button
             onClick={() => setAttachMenuOpen((o) => !o)}
             className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-black/5 text-ink-muted dark:bg-white/10"
@@ -546,7 +587,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
                 🖼️ Image
               </button>
               <button
-                onClick={() => { setAttachMenuOpen(false); alert("Voice notes are coming soon."); }}
+                onClick={() => { setAttachMenuOpen(false); setRecordingVoice(true); }}
                 className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-sm"
               >
                 🎤 Voice note
@@ -562,16 +603,30 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
             rows={1}
             className="max-h-[120px] flex-1 resize-none rounded-2xl bg-black/5 px-3.5 py-2 text-sm leading-normal outline-none focus-visible:ring-2 focus-visible:ring-brand-from dark:bg-white/10"
           />
-          <button
-            onClick={sendMessage}
-            disabled={!draft.trim()}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-gradient text-white disabled:opacity-40"
-            aria-label="Send message"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
-            </svg>
-          </button>
+          {draft.trim() ? (
+            <button
+              onClick={sendMessage}
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-gradient text-white"
+              aria-label="Send message"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
+              </svg>
+            </button>
+          ) : (
+            <button
+              onClick={() => setRecordingVoice(true)}
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-black/5 text-ink-muted dark:bg-white/10"
+              aria-label="Record voice note"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 15a3 3 0 003-3V6a3 3 0 10-6 0v6a3 3 0 003 3z" />
+                <path d="M19 11a7 7 0 01-14 0M12 18v3" strokeLinecap="round" />
+              </svg>
+            </button>
+          )}
+            </>
+          )}
         </div>
       )}
 
