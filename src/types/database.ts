@@ -14,6 +14,8 @@ export interface Profile {
   location: string | null;
   requires_follow_approval: boolean;
   is_verified: boolean;
+  last_seen_at?: string | null;
+  read_receipts_enabled?: boolean;
   created_at: string;
   updated_at: string;
 }

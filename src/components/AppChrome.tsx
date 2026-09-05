@@ -6,6 +6,7 @@ import Link from "next/link";
 import AuthHeaderControl from "./AuthHeaderControl";
 import Logo from "./Logo";
 import { useBadgeCounts } from "@/lib/useBadgeCounts";
+import { usePresenceHeartbeat } from "@/lib/usePresenceHeartbeat";
 
 const NAV_ITEMS = [
   { href: "/", label: "Home", icon: "M3 11l9-8 9 8M5 10v10h14V10" },
@@ -58,6 +59,7 @@ function SearchIcon() {
 export default function AppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { notifications, chats, friendRequests } = useBadgeCounts();
+  usePresenceHeartbeat();
   const isAuthPage = pathname?.startsWith("/auth");
   const isChatThread = pathname?.startsWith("/chat/");
   const isProfilePage =

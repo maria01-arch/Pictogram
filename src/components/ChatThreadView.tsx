@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { getBlockStatus } from "@/lib/block";
 import { createNotification } from "@/lib/notifications";
 import { markConversationRead } from "@/lib/badgeCounts";
+import { isOnline } from "@/lib/presence";
 import { uploadChatImage, resolveChatMediaUrl } from "../lib/uploadChatImage";
 import { uploadChatVoice, isVoiceNotePath } from "@/lib/uploadChatVoice";
 import VoiceRecordBar from "./VoiceRecordBar";
@@ -85,6 +86,9 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [otherProfile, setOtherProfile] = useState<Profile | null>(null);
+  const [otherLastReadAt, setOtherLastReadAt] = useState<string | null>(null);
+  const [myReadReceiptsEnabled, setMyReadReceiptsEnabled] = useState(true);
+  const [, forceTick] = useState(0); // periodic re-render so the online dot ages out on its own
   const [messages, setMessages] = useState<Message[]>([]);
   const [reactions, setReactions] = useState<MessageReaction[]>([]);
   const [draft, setDraft] = useState("");
@@ -135,7 +139,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     const [{ data: participants }, { data: msgs }] = await Promise.all([
       supabase
         .from("conversation_participants")
-        .select("user_id, profiles!conversation_participants_user_id_fkey(*)")
+        .select("user_id, last_read_at, profiles!conversation_participants_user_id_fkey(*)")
         .eq("conversation_id", conversationId),
       supabase
         .from("messages")
@@ -148,7 +152,12 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     if (other) {
       const profile = (other as any).profiles as Profile;
       setOtherProfile(profile);
+      setOtherLastReadAt((other as any).last_read_at ?? null);
       getBlockStatus(profile.id).then(setBlocked);
+    }
+    const mine = (participants ?? []).find((p: any) => p.user_id === user.id);
+    if (mine) {
+      setMyReadReceiptsEnabled((mine as any).profiles?.read_receipts_enabled ?? true);
     }
 
     setMessages(msgs ?? []);
@@ -172,6 +181,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
         (payload) => {
           const incoming = payload.new as Message;
           setMessages((prev) => (prev.some((m) => m.id === incoming.id) ? prev : [...prev, incoming]));
+          if (incoming.sender_id !== user.id) markConversationRead(conversationId);
         }
       )
       .on(
@@ -196,6 +206,24 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
         if (otherTypingTimeoutRef.current) clearTimeout(otherTypingTimeoutRef.current);
         otherTypingTimeoutRef.current = setTimeout(() => setOtherTyping(false), TYPING_TIMEOUT_MS);
       })
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "conversation_participants", filter: `conversation_id=eq.${conversationId}` },
+        (payload) => {
+          const row = payload.new as any;
+          if (row.user_id !== user.id) setOtherLastReadAt(row.last_read_at ?? null);
+        }
+      )
+      .on(
+        "postgres_changes",
+        other ? { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${(other as any).profiles.id}` } : { event: "UPDATE", schema: "public", table: "profiles" },
+        (payload) => {
+          if (!other) return;
+          const updated = payload.new as Profile;
+          if (updated.id !== (other as any).profiles.id) return;
+          setOtherProfile((prev) => (prev ? { ...prev, ...updated } : updated));
+        }
+      )
       .subscribe();
 
     channelRef.current = channel;
@@ -221,6 +249,11 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages.length]);
+
+  useEffect(() => {
+    const tick = setInterval(() => forceTick((t) => t + 1), 15_000);
+    return () => clearInterval(tick);
+  }, []);
 
   function handleDraftChange(value: string) {
     setDraft(value);
@@ -467,15 +500,24 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
 
         {otherProfile && (
           <Link href={`/profile/${otherProfile.username}`} className="flex flex-1 items-center gap-2 overflow-hidden">
-            <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-brand-gradient">
-              {otherProfile.avatar_url && <img src={otherProfile.avatar_url} alt="" className="h-full w-full object-cover" />}
+            <div className="relative h-8 w-8 shrink-0">
+              <div className="h-8 w-8 overflow-hidden rounded-full bg-brand-gradient">
+                {otherProfile.avatar_url && <img src={otherProfile.avatar_url} alt="" className="h-full w-full object-cover" />}
+              </div>
+              {isOnline(otherProfile.last_seen_at) && (
+                <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-surface-light bg-green-500 dark:border-surface-dark" />
+              )}
             </div>
             <div className="min-w-0">
               <p className="flex items-center gap-1 truncate text-sm font-semibold">
                 {otherProfile.username}
                 {otherProfile.is_verified && <VerifiedBadge size={12} />}
               </p>
-              {otherTyping && <p className="text-[11px] text-brand-from">typing…</p>}
+              {otherTyping ? (
+                <p className="text-[11px] text-brand-from">typing…</p>
+              ) : isOnline(otherProfile.last_seen_at) ? (
+                <p className="text-[11px] text-ink-muted">Online</p>
+              ) : null}
             </div>
           </Link>
         )}
@@ -503,6 +545,8 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
           const mine = m.sender_id === userId;
           const grouped = reactionsFor(m.id);
           const quote = quotedContent(m.reply_to_id);
+          const canShowReadReceipts = myReadReceiptsEnabled && (otherProfile?.read_receipts_enabled ?? true);
+          const seen = canShowReadReceipts && !!otherLastReadAt && m.created_at <= otherLastReadAt;
 
           return (
             <div
@@ -587,6 +631,21 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
               )}
               </div>
               </div>
+
+              {mine && (
+                <div className="mt-0.5 flex items-center gap-1 px-1">
+                  <svg
+                    width="14"
+                    height="10"
+                    viewBox="0 0 16 10"
+                    fill="none"
+                    className={seen ? "text-brand-from" : "text-ink-muted"}
+                  >
+                    <path d="M1 5l3 3 5-7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M6 5l3 3 6-8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+              )}
 
               {Object.keys(grouped).length > 0 && (
                 <div className="mt-0.5 flex gap-1">

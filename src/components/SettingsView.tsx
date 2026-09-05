@@ -7,6 +7,7 @@ import { checkIsAdmin } from "../lib/admin";
 
 export default function SettingsView() {
   const [requiresApproval, setRequiresApproval] = useState(false);
+  const [readReceipts, setReadReceipts] = useState(true);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -17,8 +18,9 @@ export default function SettingsView() {
       if (!user) return setLoading(false);
       setUserId(user.id);
 
-      const { data } = await supabase.from("profiles").select("requires_follow_approval").eq("id", user.id).single();
+      const { data } = await supabase.from("profiles").select("requires_follow_approval, read_receipts_enabled").eq("id", user.id).single();
       setRequiresApproval(!!data?.requires_follow_approval);
+      setReadReceipts(data?.read_receipts_enabled ?? true);
       setLoading(false);
 
       // Silent — this only ever resolves true for the one granted account.
@@ -33,6 +35,13 @@ export default function SettingsView() {
     const next = !requiresApproval;
     setRequiresApproval(next);
     await supabase.from("profiles").update({ requires_follow_approval: next }).eq("id", userId);
+  }
+
+  async function toggleReadReceipts() {
+    if (!userId) return;
+    const next = !readReceipts;
+    setReadReceipts(next);
+    await supabase.from("profiles").update({ read_receipts_enabled: next }).eq("id", userId);
   }
 
   if (loading) return <p className="px-4 py-16 text-center text-sm text-ink-muted">Loading…</p>;
@@ -51,6 +60,19 @@ export default function SettingsView() {
           className={`h-6 w-11 shrink-0 rounded-full transition ${requiresApproval ? "bg-brand-gradient" : "bg-black/15 dark:bg-white/15"}`}
         >
           <span className={`block h-5 w-5 translate-y-0.5 rounded-full bg-white transition-transform ${requiresApproval ? "translate-x-5" : "translate-x-0.5"}`} />
+        </button>
+      </div>
+
+      <div className="mt-3 flex items-center justify-between rounded-xl2 glass-card px-4 py-3.5">
+        <div>
+          <p className="text-sm font-semibold">Read receipts</p>
+          <p className="mt-0.5 text-xs text-ink-muted">Let people see when you've read their messages</p>
+        </div>
+        <button
+          onClick={toggleReadReceipts}
+          className={`h-6 w-11 shrink-0 rounded-full transition ${readReceipts ? "bg-brand-gradient" : "bg-black/15 dark:bg-white/15"}`}
+        >
+          <span className={`block h-5 w-5 translate-y-0.5 rounded-full bg-white transition-transform ${readReceipts ? "translate-x-5" : "translate-x-0.5"}`} />
         </button>
       </div>
 
