@@ -93,6 +93,12 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [confirmingDeleteMessage, setConfirmingDeleteMessage] = useState<Message | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [swipeMsgId, setSwipeMsgId] = useState<string | null>(null);
+  const [swipeX, setSwipeX] = useState(0);
+  const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const swipeLockedRef = useRef(false);
+  const SWIPE_REPLY_THRESHOLD = 56;
+  const SWIPE_REPLY_MAX = 72;
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [blocked, setBlocked] = useState({ blockedByMe: false, blockedMe: false });
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
@@ -383,6 +389,45 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     setEditingMessage(null);
     setMenu(null);
   }
+
+  // Swipe-right-to-reply. Runs on the whole message row (parent of the
+  // bubble), alongside — not instead of — the existing long-press-to-open-menu
+  // handlers on the bubble itself.
+  function handleRowTouchStart(e: React.TouchEvent) {
+    const t = e.touches[0];
+    swipeStartRef.current = { x: t.clientX, y: t.clientY };
+    swipeLockedRef.current = false;
+  }
+  function handleRowTouchMove(m: Message, e: React.TouchEvent) {
+    const start = swipeStartRef.current;
+    if (!start) return;
+    const t = e.touches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+
+    if (!swipeLockedRef.current) {
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      if (Math.abs(dy) > Math.abs(dx)) {
+        // Vertical scroll intent — this gesture isn't a swipe, stop tracking it.
+        swipeStartRef.current = null;
+        return;
+      }
+      swipeLockedRef.current = true;
+    }
+
+    setSwipeMsgId(m.id);
+    setSwipeX(dx > 0 ? Math.min(dx, SWIPE_REPLY_MAX) : 0);
+  }
+  function handleRowTouchEnd(m: Message) {
+    const committed = swipeLockedRef.current;
+    swipeStartRef.current = null;
+    swipeLockedRef.current = false;
+    if (committed && swipeMsgId === m.id && swipeX >= SWIPE_REPLY_THRESHOLD) {
+      handleReply(m);
+    }
+    setSwipeMsgId(null);
+    setSwipeX(0);
+  }
   function handleEdit(message: Message) {
     setEditingMessage(message);
     setReplyingTo(null);
@@ -460,7 +505,29 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
           const quote = quotedContent(m.reply_to_id);
 
           return (
-            <div key={m.id} className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
+            <div
+              key={m.id}
+              className={`flex flex-col ${mine ? "items-end" : "items-start"}`}
+              onTouchStart={handleRowTouchStart}
+              onTouchMove={(e) => handleRowTouchMove(m, e)}
+              onTouchEnd={() => handleRowTouchEnd(m)}
+            >
+              <div className="relative w-full">
+                <div
+                  className="pointer-events-none absolute inset-y-0 left-0 flex items-center text-ink-muted transition-opacity"
+                  style={{ opacity: swipeMsgId === m.id ? Math.min(1, swipeX / SWIPE_REPLY_THRESHOLD) : 0 }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M9 17l-5-5 5-5M4 12h11a5 5 0 015 5v1" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+                <div
+                  className={`flex flex-col ${mine ? "items-end" : "items-start"}`}
+                  style={{
+                    transform: `translateX(${swipeMsgId === m.id ? swipeX : 0}px)`,
+                    transition: swipeMsgId === m.id ? "none" : "transform 150ms ease-out",
+                  }}
+                >
               {m.media_url && isVoiceNotePath(m.media_url) ? (
                 <div
                   onTouchStart={(e) => startLongPress(m, e.touches[0].clientX, e.touches[0].clientY)}
@@ -481,7 +548,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
                   <ChatImage path={m.media_url} onTap={handleImageTap} />
                   {m.content && (
                     <p
-                      className={`break-words px-3 py-2 text-[15px] leading-snug ${
+                      className={`whitespace-pre-wrap break-words px-3 py-2 text-[15px] leading-snug ${
                         mine ? "bg-brand-gradient text-white" : "bg-black/5 dark:bg-white/10"
                       }`}
                     >
@@ -505,7 +572,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
                   onTouchEnd={cancelLongPress}
                   onTouchMove={cancelLongPress}
                   onContextMenu={(e) => { e.preventDefault(); setMenu({ message: m, x: e.clientX, y: e.clientY }); }}
-                  className={`max-w-[75%] select-none break-words rounded-2xl px-4 py-2.5 text-[15px] leading-snug ${
+                  className={`max-w-[75%] select-none whitespace-pre-wrap break-words rounded-2xl px-4 py-2.5 text-[15px] leading-snug ${
                     mine ? "bg-brand-gradient text-white" : "bg-black/5 dark:bg-white/10"
                   }`}
                 >
@@ -518,6 +585,8 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
                   {m.edited_at && <span className="ml-1.5 text-[10px] opacity-60">(edited)</span>}
                 </div>
               )}
+              </div>
+              </div>
 
               {Object.keys(grouped).length > 0 && (
                 <div className="mt-0.5 flex gap-1">

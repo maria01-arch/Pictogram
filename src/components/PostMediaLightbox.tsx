@@ -44,7 +44,7 @@ export default function PostMediaLightbox({ post, onClose }: { post: Post; onClo
         </div>
       ) : post.media_type === "text" ? (
         <div className="mx-8 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-          <p className="text-2xl font-medium leading-relaxed text-white">{post.text_content}</p>
+          <p className="whitespace-pre-wrap text-2xl font-medium leading-relaxed text-white">{post.text_content}</p>
         </div>
       ) : post.media_type === "video" ? (
         <video

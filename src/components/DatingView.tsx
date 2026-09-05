@@ -279,7 +279,7 @@ export default function DatingView() {
                       {currentCandidate.profile.username}
                       {currentCandidate.profile.is_verified && <VerifiedBadge size={14} />}
                     </p>
-                    {currentCandidate.bio && <p className="mt-1 text-sm text-ink-muted">{currentCandidate.bio}</p>}
+                    {currentCandidate.bio && <p className="mt-1 whitespace-pre-wrap text-sm text-ink-muted">{currentCandidate.bio}</p>}
                   </div>
                   <div className="flex border-t border-black/5 dark:border-white/5">
                     <button onClick={handlePass} className="flex-1 py-3 text-sm font-semibold text-ink-muted">

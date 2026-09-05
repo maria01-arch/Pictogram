@@ -22,7 +22,7 @@ export default function ReadMoreText({
   const display = !isLong || expanded ? text : text.slice(0, limit).trimEnd() + "…";
 
   return (
-    <span className={className}>
+    <span className={`whitespace-pre-wrap ${className}`}>
       {render ? render(display) : display}
       {isLong && (
         <button

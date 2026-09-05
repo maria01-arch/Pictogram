@@ -163,7 +163,7 @@ export default function StoryViewer({
 
       {current.media_type === "text" ? (
         <div className="flex h-full w-full items-center justify-center bg-brand-gradient px-8">
-          <p className="text-center text-xl font-semibold leading-relaxed text-white">{current.text_content}</p>
+          <p className="whitespace-pre-wrap text-center text-xl font-semibold leading-relaxed text-white">{current.text_content}</p>
         </div>
       ) : current.media_type === "video" ? (
         <video
