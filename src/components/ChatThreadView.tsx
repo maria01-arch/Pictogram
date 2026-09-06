@@ -9,6 +9,7 @@ import { getBlockStatus } from "@/lib/block";
 import { createNotification } from "@/lib/notifications";
 import { markConversationRead } from "@/lib/badgeCounts";
 import { isOnline } from "@/lib/presence";
+import { AI_BOT_USERNAME } from "@/lib/aiBot";
 import { uploadChatImage, resolveChatMediaUrl } from "../lib/uploadChatImage";
 import { uploadChatVoice, isVoiceNotePath } from "@/lib/uploadChatVoice";
 import VoiceRecordBar from "./VoiceRecordBar";
@@ -311,14 +312,35 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     setMessages((prev) => prev.map((m) => (m.id === optimisticId ? data : m)));
 
     if (otherProfile) {
-      createNotification({
-        targetUserId: otherProfile.id,
-        type: "message",
-        conversationId,
-        pushTitle: "New message",
-        pushBody: content.length > 60 ? content.slice(0, 60) + "…" : content,
-        pushUrl: `/chat/${conversationId}`,
+      if (otherProfile.username === AI_BOT_USERNAME) {
+        requestAiReply();
+      } else {
+        createNotification({
+          targetUserId: otherProfile.id,
+          type: "message",
+          conversationId,
+          pushTitle: "New message",
+          pushBody: content.length > 60 ? content.slice(0, 60) + "…" : content,
+          pushUrl: `/chat/${conversationId}`,
+        });
+      }
+    }
+  }
+
+  async function requestAiReply() {
+    setOtherTyping(true);
+    try {
+      const res = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "chat", conversationId }),
       });
+      if (!res.ok) throw new Error("AI request failed");
+    } catch {
+      // Best-effort — if this fails, the thread just doesn't get a reply
+      // rather than showing an error for what's a nice-to-have feature.
+    } finally {
+      setOtherTyping(false);
     }
   }
 

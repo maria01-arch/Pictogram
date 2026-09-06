@@ -7,6 +7,7 @@ import { useTopLoading } from "./TopLoadingBar";
 import { ConversationListSkeleton } from "./Skeleton";
 import { isOnline } from "@/lib/presence";
 import { hideConversation, reportConversation } from "@/lib/conversationActions";
+import { ensureAiConversation, AI_BOT_USERNAME } from "@/lib/aiBot";
 import { blockUser } from "@/lib/block";
 import ConversationActionSheet from "./ConversationActionSheet";
 
@@ -120,6 +121,8 @@ export default function ConversationList() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+
+      await ensureAiConversation();
 
       const { data, error } = await supabase
         .from("conversation_participants")
@@ -242,9 +245,11 @@ export default function ConversationList() {
     <>
       <ul className="divide-y divide-black/5 dark:divide-white/5">
         {conversations.map((c) => {
-          const offset = revealedId === c.id ? REVEAL_MAX : swipeId === c.id ? swipeX : 0;
+          const isBot = c.other_username === AI_BOT_USERNAME;
+          const offset = isBot ? 0 : revealedId === c.id ? REVEAL_MAX : swipeId === c.id ? swipeX : 0;
           return (
             <li key={c.id} className="relative overflow-hidden">
+              {!isBot && (
               <button
                 onClick={() => setSheetFor(c)}
                 aria-label="Delete conversation"
@@ -255,11 +260,12 @@ export default function ConversationList() {
                 </svg>
                 <span className="text-[11px] font-medium">Delete</span>
               </button>
+              )}
 
               <div
-                onTouchStart={(e) => handleRowTouchStart(c, e)}
-                onTouchMove={(e) => handleRowTouchMove(c, e)}
-                onTouchEnd={() => handleRowTouchEnd(c)}
+                onTouchStart={(e) => !isBot && handleRowTouchStart(c, e)}
+                onTouchMove={(e) => !isBot && handleRowTouchMove(c, e)}
+                onTouchEnd={() => !isBot && handleRowTouchEnd(c)}
                 style={{
                   transform: `translateX(${offset}px)`,
                   transition: swipeId === c.id ? "none" : "transform 150ms ease-out",

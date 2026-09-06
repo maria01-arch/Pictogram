@@ -6,6 +6,7 @@ import { uploadPost, uploadStory, uploadCarouselPost, type UploadStage } from "@
 import { uploadTextPost, uploadTextStory, wordCount, MIN_TEXT_POST_WORDS } from "@/lib/uploadText";
 import { getErrorMessage } from "@/lib/errorMessage";
 import PostMediaEditor, { type MediaEditorResult } from "./PostMediaEditor";
+import AiCaptionHelper from "./AiCaptionHelper";
 
 const STAGE_LABEL: Record<UploadStage, string> = {
   compressing: "Compressing your media…",
@@ -235,13 +236,16 @@ export default function CreatePostForm() {
           )}
 
           {mode === "post" && (
-            <textarea
-              value={caption}
-              onChange={(e) => setCaption(e.target.value)}
-              placeholder="Write a caption… (#hashtags work too)"
-              rows={3}
-              className="mt-4 w-full rounded-xl2 bg-black/5 p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-from dark:bg-white/10"
-            />
+            <>
+              <textarea
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                placeholder="Write a caption… (#hashtags work too)"
+                rows={3}
+                className="mt-4 w-full rounded-xl2 bg-black/5 p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-from dark:bg-white/10"
+              />
+              <AiCaptionHelper onPick={setCaption} />
+            </>
           )}
         </>
       ) : (
