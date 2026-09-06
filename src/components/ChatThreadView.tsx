@@ -335,14 +335,30 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "chat", conversationId }),
       });
-      if (!res.ok) throw new Error("AI request failed");
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (data.message) {
         setMessages((prev) => (prev.some((m) => m.id === data.message.id) ? prev : [...prev, data.message]));
+      } else if (!res.ok) {
+        throw new Error(data.error || "AI request failed");
       }
     } catch {
-      // Best-effort — if this fails, the thread just doesn't get a reply
-      // rather than showing an error for what's a nice-to-have feature.
+      // The route itself already tries hard to insert a real, visible
+      // apology on failure — this only fires for something even more
+      // fundamental (no network, request never reached the server), so a
+      // local-only notice is the right fallback here.
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `ai-error-${Date.now()}`,
+          conversation_id: conversationId,
+          sender_id: otherProfile?.id ?? "",
+          content: "Couldn't reach the AI right now — check your connection and try again.",
+          media_url: null,
+          reply_to_id: null,
+          edited_at: null,
+          created_at: new Date().toISOString(),
+        },
+      ]);
     } finally {
       setOtherTyping(false);
     }

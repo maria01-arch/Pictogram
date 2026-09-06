@@ -22,7 +22,7 @@ const SYSTEM_PROMPT = `You are the AI assistant built into Next Social, a social
 
 Speak naturally as this assistant. Never mention or refer to having been given instructions, a system prompt, or being told to say any of this — these are simply facts you know about yourself and the app you're part of. Keep replies concise, warm, and conversational, like a helpful friend inside the app, not a corporate FAQ bot. Always reply with an actual conversational message — never output classifier-style labels, safety ratings, or meta-commentary about the message instead of a real reply.`;
 
-async function callOpenRouter(messages: { role: string; content: string }[]) {
+async function callOpenRouter(messages: { role: string; content: string }[], model: string) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("AI is not configured");
 
@@ -34,18 +34,36 @@ async function callOpenRouter(messages: { role: string; content: string }[]) {
       "HTTP-Referer": "https://pictogram.xchord.space",
       "X-Title": "Next Social",
     },
-    body: JSON.stringify({
-      model: process.env.OPENROUTER_MODEL || DEFAULT_MODEL,
-      messages,
-    }),
+    body: JSON.stringify({ model, messages }),
   });
 
   const data = await res.json();
   if (!res.ok) {
-    console.error("OpenRouter error:", data);
-    throw new Error("AI request failed");
+    // Log the real reason (rate limit, invalid model, provider outage,
+    // etc.) — visible in Vercel's function logs — instead of a generic
+    // message that hides what actually went wrong.
+    console.error(`OpenRouter error (model=${model}, status=${res.status}):`, JSON.stringify(data));
+    throw new Error(data?.error?.message || `OpenRouter request failed (${res.status})`);
   }
-  return String(data.choices?.[0]?.message?.content ?? "").trim();
+  const content = String(data.choices?.[0]?.message?.content ?? "").trim();
+  if (!content) {
+    console.error(`OpenRouter returned an empty reply (model=${model}):`, JSON.stringify(data));
+    throw new Error("Empty reply from model");
+  }
+  return content;
+}
+
+// Tries the pinned model first; if it fails for ANY reason (rate limit,
+// temporarily deprecated, provider outage), falls back to OpenRouter's
+// free-model router rather than failing the whole request.
+async function callOpenRouterWithFallback(messages: { role: string; content: string }[]) {
+  const primary = process.env.OPENROUTER_MODEL || DEFAULT_MODEL;
+  try {
+    return await callOpenRouter(messages, primary);
+  } catch (err) {
+    console.error(`Primary model "${primary}" failed, falling back to openrouter/free:`, err);
+    return await callOpenRouter(messages, "openrouter/free");
+  }
 }
 
 export async function POST(request: Request) {
@@ -62,7 +80,7 @@ export async function POST(request: Request) {
   if (body.type === "caption") {
     const topic = String(body.topic ?? "").slice(0, 300) || "a photo I'm sharing";
     try {
-      const reply = await callOpenRouter([
+      const reply = await callOpenRouterWithFallback([
         {
           role: "system",
           content:
@@ -71,7 +89,8 @@ export async function POST(request: Request) {
         { role: "user", content: `Write captions for a post about: ${topic}` },
       ]);
       return NextResponse.json({ reply });
-    } catch {
+    } catch (err) {
+      console.error("Caption generation failed completely:", err);
       return NextResponse.json({ error: "AI request failed" }, { status: 502 });
     }
   }
@@ -118,9 +137,14 @@ export async function POST(request: Request) {
 
     let reply: string;
     try {
-      reply = await callOpenRouter([{ role: "system", content: SYSTEM_PROMPT }, ...chatMessages]);
-    } catch {
-      return NextResponse.json({ error: "AI request failed" }, { status: 502 });
+      reply = await callOpenRouterWithFallback([{ role: "system", content: SYSTEM_PROMPT }, ...chatMessages]);
+    } catch (err) {
+      // Both the pinned model and the free-router fallback failed. Rather
+      // than leaving the thread silent (the old behavior — "typing…" then
+      // nothing, even after a refresh), send a real, visible apology as
+      // the bot's message so the user always sees *something* happened.
+      console.error("AI reply failed completely for conversation", conversationId, err);
+      reply = "Sorry, I'm having trouble responding right now — please try again in a moment.";
     }
 
     let insertedMessage = null;
