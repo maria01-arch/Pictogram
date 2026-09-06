@@ -336,6 +336,10 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
         body: JSON.stringify({ type: "chat", conversationId }),
       });
       if (!res.ok) throw new Error("AI request failed");
+      const data = await res.json();
+      if (data.message) {
+        setMessages((prev) => (prev.some((m) => m.id === data.message.id) ? prev : [...prev, data.message]));
+      }
     } catch {
       // Best-effort — if this fails, the thread just doesn't get a reply
       // rather than showing an error for what's a nice-to-have feature.

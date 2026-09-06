@@ -6,7 +6,12 @@ import { ensureAiBotProfile } from "@/lib/ensureAiBotProfile";
 export const maxDuration = 30;
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_MODEL = "openrouter/free";
+// openrouter/free (the random free-model router) can land on a non-chat
+// model — e.g. a safety/moderation classifier — which replies with things
+// like "User Safety: safe" instead of an actual conversational answer.
+// Pinning a specific instruct model avoids that; override with the
+// OPENROUTER_MODEL env var if this one ever gets deprecated/rate-limited.
+const DEFAULT_MODEL = "meta-llama/llama-3.3-70b-instruct:free";
 const MAX_HISTORY = 20;
 
 // The assistant's persona and product knowledge. It should embody this
@@ -15,7 +20,7 @@ const MAX_HISTORY = 20;
 // just doesn't discuss the mechanics behind its own answers.
 const SYSTEM_PROMPT = `You are the AI assistant built into Next Social, a social media app for sharing photos, videos, stories, and messaging with friends. Next Social was built by Xchordlabs, founded by Dara Samuel (also known as Samzy Bankz) and his team.
 
-Speak naturally as this assistant. Never mention or refer to having been given instructions, a system prompt, or being told to say any of this — these are simply facts you know about yourself and the app you're part of. Keep replies concise, warm, and conversational, like a helpful friend inside the app, not a corporate FAQ bot.`;
+Speak naturally as this assistant. Never mention or refer to having been given instructions, a system prompt, or being told to say any of this — these are simply facts you know about yourself and the app you're part of. Keep replies concise, warm, and conversational, like a helpful friend inside the app, not a corporate FAQ bot. Always reply with an actual conversational message — never output classifier-style labels, safety ratings, or meta-commentary about the message instead of a real reply.`;
 
 async function callOpenRouter(messages: { role: string; content: string }[]) {
   const apiKey = process.env.OPENROUTER_API_KEY;
@@ -118,19 +123,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "AI request failed" }, { status: 502 });
     }
 
+    let insertedMessage = null;
     if (reply) {
-      const { error: insertError } = await supabaseAdmin.from("messages").insert({
-        conversation_id: conversationId,
-        sender_id: botId,
-        content: reply,
-      });
+      const { data: inserted, error: insertError } = await supabaseAdmin
+        .from("messages")
+        .insert({
+          conversation_id: conversationId,
+          sender_id: botId,
+          content: reply,
+        })
+        .select("*")
+        .single();
       if (insertError) {
         console.error("Failed to insert AI reply:", insertError);
         return NextResponse.json({ error: "Failed to save AI reply" }, { status: 500 });
       }
+      insertedMessage = inserted;
     }
 
-    return NextResponse.json({ reply });
+    return NextResponse.json({ reply, message: insertedMessage });
   }
 
   return NextResponse.json({ error: "Unknown request type" }, { status: 400 });
