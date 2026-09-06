@@ -102,7 +102,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
   return (
     <>
       <header
-        className={`safe-top sticky top-0 z-30 glass-card transition-transform duration-300 ease-out ${
+        className={`safe-top sticky top-0 z-30 glass-header transition-transform duration-300 ease-out ${
           headerHidden ? "-translate-y-full" : "translate-y-0"
         }`}
       >
@@ -111,7 +111,9 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
             <h1 className="text-xl font-bold text-black dark:text-white">{titledRoute.title}</h1>
           ) : (
             <div className="flex items-center gap-2">
-              <Logo height={26} />
+              <div className="rounded-full bg-brand-gradient p-1.5 shadow-[0_2px_10px_-2px_rgba(23,195,236,0.6)]">
+                <Logo height={18} />
+              </div>
               <span className="text-base font-bold tracking-tight text-black dark:text-white">
                 Next Social
               </span>
@@ -127,15 +129,16 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
       <main className="mx-auto max-w-lg pb-16">{children}</main>
 
       {!hideBottomNav && (
-      <nav className="safe-bottom fixed bottom-0 left-0 right-0 z-30 glass-card">
+      <nav className="safe-bottom fixed bottom-0 left-0 right-0 z-30 glass-nav">
         <div className="mx-auto flex max-w-lg items-center justify-around py-2">
           {NAV_ITEMS.map((item) => {
             const navCount = item.href === "/chat" ? chats : item.href === "/friends" ? friendRequests : 0;
+            const isActive = item.href === "/" ? pathname === "/" : pathname?.startsWith(item.href);
             return item.special ? (
               <Link
                 key={item.href}
                 href={item.href}
-                className="-mt-4 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-gradient text-white shadow-lg transition active:scale-95"
+                className="-mt-4 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-gradient text-white shadow-[0_6px_18px_-4px_rgba(37,71,244,0.55)] transition active:scale-95"
                 aria-label={item.label}
               >
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
@@ -146,15 +149,17 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className="relative flex flex-col items-center gap-0.5 px-4 py-1 text-ink-muted transition hover:text-brand-from active:scale-95"
+                className={`relative flex flex-col items-center gap-0.5 px-4 py-1 transition active:scale-95 ${
+                  isActive ? "text-brand-from" : "text-ink-muted hover:text-brand-from"
+                }`}
               >
-                <span className="relative">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <span className={`relative rounded-full p-1.5 transition ${isActive ? "bg-brand-from/10" : ""}`}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.2 : 1.8}>
                     <path d={item.icon} strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   <Badge count={navCount} />
                 </span>
-                <span className="text-[11px] font-medium">{item.label}</span>
+                <span className={`text-[11px] ${isActive ? "font-semibold" : "font-medium"}`}>{item.label}</span>
               </Link>
             );
           })}

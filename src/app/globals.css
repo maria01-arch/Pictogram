@@ -33,6 +33,24 @@ html.dark {
            border border-black/5 dark:border-white/5;
   }
 
+  /* Richer frosted glass for the header/nav — stronger blur, a soft ambient
+     shadow, and a hairline inner highlight for a bit of depth instead of a
+     flat translucent slab. */
+  .glass-header {
+    @apply bg-white/75 dark:bg-surface-dark/75 backdrop-blur-xl border-b border-black/5 dark:border-white/10;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset, 0 8px 24px -10px rgba(0, 0, 0, 0.18);
+  }
+  html.dark .glass-header {
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 8px 24px -8px rgba(0, 0, 0, 0.6);
+  }
+  .glass-nav {
+    @apply bg-white/75 dark:bg-surface-dark/75 backdrop-blur-xl border-t border-black/5 dark:border-white/10;
+    box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.5) inset, 0 -8px 24px -10px rgba(0, 0, 0, 0.18);
+  }
+  html.dark .glass-nav {
+    box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.06) inset, 0 -8px 24px -8px rgba(0, 0, 0, 0.6);
+  }
+
   /* For the transparent-status-bar webtoapp wrapper: pads content below
      the notch/status bar and above the home-indicator/gesture bar.
      env(safe-area-inset-*) is 0 in a normal browser, so this is a no-op
