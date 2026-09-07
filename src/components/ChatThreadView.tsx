@@ -223,24 +223,6 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
         if (otherTypingTimeoutRef.current) clearTimeout(otherTypingTimeoutRef.current);
         otherTypingTimeoutRef.current = setTimeout(() => setOtherTyping(false), TYPING_TIMEOUT_MS);
       })
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "conversation_participants", filter: `conversation_id=eq.${conversationId}` },
-        (payload) => {
-          const row = payload.new as any;
-          if (row.user_id !== user.id) setOtherLastReadAt(row.last_read_at ?? null);
-        }
-      )
-      .on(
-        "postgres_changes",
-        other ? { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${(other as any).profiles.id}` } : { event: "UPDATE", schema: "public", table: "profiles" },
-        (payload) => {
-          if (!other) return;
-          const updated = payload.new as Profile;
-          if (updated.id !== (other as any).profiles.id) return;
-          setOtherProfile((prev) => (prev ? { ...prev, ...updated } : updated));
-        }
-      )
       .subscribe();
 
     channelRef.current = channel;
@@ -268,9 +250,30 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
   }, [messages.length]);
 
   useEffect(() => {
-    const tick = setInterval(() => forceTick((t) => t + 1), 15_000);
+    async function poll() {
+      forceTick((t) => t + 1); // ages out the online dot even with no new data
+      if (!otherProfile) return;
+
+      const { data: row } = await supabase
+        .from("conversation_participants")
+        .select("last_read_at")
+        .eq("conversation_id", conversationId)
+        .eq("user_id", otherProfile.id)
+        .maybeSingle();
+      if (row) setOtherLastReadAt(row.last_read_at ?? null);
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("last_seen_at, read_receipts_enabled")
+        .eq("id", otherProfile.id)
+        .maybeSingle();
+      if (profile) setOtherProfile((prev) => (prev ? { ...prev, ...profile } : prev));
+    }
+
+    const tick = setInterval(poll, 15_000);
     return () => clearInterval(tick);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId, otherProfile?.id]);
 
   function handleDraftChange(value: string) {
     setDraft(value);
@@ -395,12 +398,18 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     setUploadingImage(true);
     try {
       const mediaUrl = await uploadChatImage(file);
-      await supabase.from("messages").insert({
-        conversation_id: conversationId,
-        sender_id: userId,
-        content: caption || null,
-        media_url: mediaUrl,
-      });
+      const { data, error } = await supabase
+        .from("messages")
+        .insert({
+          conversation_id: conversationId,
+          sender_id: userId,
+          content: caption || null,
+          media_url: mediaUrl,
+        })
+        .select("*")
+        .single();
+      if (error) throw error;
+      setMessages((prev) => (prev.some((m) => m.id === data.id) ? prev : [...prev, data]));
     } catch {
       alert("Failed to send image. Try again.");
     } finally {
@@ -415,12 +424,18 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     setUploadingVoice(true);
     try {
       const mediaUrl = await uploadChatVoice(blob, mimeType);
-      await supabase.from("messages").insert({
-        conversation_id: conversationId,
-        sender_id: userId,
-        content: null,
-        media_url: mediaUrl,
-      });
+      const { data, error } = await supabase
+        .from("messages")
+        .insert({
+          conversation_id: conversationId,
+          sender_id: userId,
+          content: null,
+          media_url: mediaUrl,
+        })
+        .select("*")
+        .single();
+      if (error) throw error;
+      setMessages((prev) => (prev.some((m) => m.id === data.id) ? prev : [...prev, data]));
     } catch {
       alert("Failed to send voice note. Try again.");
     } finally {
@@ -557,32 +572,32 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
       className="fixed inset-x-0 flex flex-col"
       style={{ top: "var(--app-offset-top, 0px)", height: "var(--app-height, 100dvh)" }}
     >
-      <header className="safe-top flex shrink-0 items-center gap-2.5 border-b border-black/5 px-3 py-2 dark:border-white/5">
-        <button onClick={() => router.back()} aria-label="Back" className="shrink-0">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <header className="safe-top flex shrink-0 items-center gap-3 border-b border-black/5 px-3.5 py-3 dark:border-white/5">
+        <button onClick={() => router.back()} aria-label="Back" className="shrink-0 p-1">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
             <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
 
         {otherProfile && (
-          <Link href={`/profile/${otherProfile.username}`} className="flex flex-1 items-center gap-2 overflow-hidden">
-            <div className="relative h-8 w-8 shrink-0">
-              <div className="h-8 w-8 overflow-hidden rounded-full bg-brand-gradient">
+          <Link href={`/profile/${otherProfile.username}`} className="flex flex-1 items-center gap-2.5 overflow-hidden">
+            <div className="relative h-11 w-11 shrink-0">
+              <div className="h-11 w-11 overflow-hidden rounded-full bg-brand-gradient">
                 {otherProfile.avatar_url && <img src={otherProfile.avatar_url} alt="" className="h-full w-full object-cover" />}
               </div>
               {isOnline(otherProfile.last_seen_at) && (
-                <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-surface-light bg-green-500 dark:border-surface-dark" />
+                <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-surface-light bg-green-500 dark:border-surface-dark" />
               )}
             </div>
             <div className="min-w-0">
-              <p className="flex items-center gap-1 truncate text-sm font-semibold">
+              <p className="flex items-center gap-1 truncate text-base font-semibold">
                 {otherProfile.username}
-                {otherProfile.is_verified && <VerifiedBadge size={12} />}
+                {otherProfile.is_verified && <VerifiedBadge size={14} />}
               </p>
               {otherTyping ? (
-                <p className="text-[11px] text-brand-from">typing…</p>
+                <p className="text-xs text-brand-from">typing…</p>
               ) : isOnline(otherProfile.last_seen_at) ? (
-                <p className="text-[11px] text-ink-muted">Online</p>
+                <p className="text-xs text-ink-muted">Online</p>
               ) : null}
             </div>
           </Link>
@@ -783,7 +798,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
           {blocked.blockedByMe ? "You've blocked this user." : "You can't message this user."}
         </div>
       ) : (
-        <div className="relative flex shrink-0 items-center gap-2 border-t border-black/5 px-2.5 py-2 dark:border-white/5">
+        <div className="relative flex shrink-0 items-center gap-2.5 border-t border-black/5 px-3 py-2.5 dark:border-white/5">
           <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelected} className="hidden" />
 
           {recordingVoice ? (
@@ -792,25 +807,25 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
             <>
           <button
             onClick={() => setAttachMenuOpen((o) => !o)}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-black/5 text-ink-muted dark:bg-white/10"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-black/5 text-ink-muted dark:bg-white/10"
             aria-label="Attach"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 5v14M5 12h14" strokeLinecap="round" />
             </svg>
           </button>
 
           {attachMenuOpen && (
-            <div className="absolute bottom-12 left-2 z-20 w-44 overflow-hidden rounded-xl2 glass-card shadow-lg">
+            <div className="absolute bottom-14 left-2 z-20 w-48 overflow-hidden rounded-xl2 glass-card shadow-lg">
               <button
                 onClick={() => { setAttachMenuOpen(false); fileInputRef.current?.click(); }}
-                className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-sm"
+                className="flex w-full items-center gap-2 px-4 py-3 text-left text-[15px]"
               >
                 🖼️ Image
               </button>
               <button
                 onClick={() => { setAttachMenuOpen(false); setRecordingVoice(true); }}
-                className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-sm"
+                className="flex w-full items-center gap-2 px-4 py-3 text-left text-[15px]"
               >
                 🎤 Voice note
               </button>
@@ -823,25 +838,25 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
             onChange={(e) => handleDraftChange(e.target.value)}
             placeholder="Message…"
             rows={1}
-            className="max-h-[120px] flex-1 resize-none rounded-2xl bg-black/5 px-3.5 py-2 text-sm leading-normal outline-none focus-visible:ring-2 focus-visible:ring-brand-from dark:bg-white/10"
+            className="max-h-[120px] flex-1 resize-none rounded-2xl bg-black/5 px-4 py-2.5 text-base leading-normal outline-none focus-visible:ring-2 focus-visible:ring-brand-from dark:bg-white/10"
           />
           {draft.trim() ? (
             <button
               onClick={sendMessage}
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-gradient text-white"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand-gradient text-white"
               aria-label="Send message"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
               </svg>
             </button>
           ) : (
             <button
               onClick={() => setRecordingVoice(true)}
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-black/5 text-ink-muted dark:bg-white/10"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-black/5 text-ink-muted dark:bg-white/10"
               aria-label="Record voice note"
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M12 15a3 3 0 003-3V6a3 3 0 10-6 0v6a3 3 0 003 3z" />
                 <path d="M19 11a7 7 0 01-14 0M12 18v3" strokeLinecap="round" />
               </svg>

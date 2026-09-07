@@ -46,8 +46,12 @@ function NotificationIcon({ count }: { count: number }) {
 
 function SearchIcon() {
   return (
-    <Link href="/search" aria-label="Search" className="rounded-full p-2 text-ink-light transition hover:bg-black/5 dark:text-ink-dark dark:hover:bg-white/10">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <Link
+      href="/search"
+      aria-label="Search"
+      className="rounded-full bg-brand-from/10 p-2.5 text-brand-from transition hover:bg-brand-from/20"
+    >
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
         <circle cx="11" cy="11" r="7" />
         <path d="M21 21l-4.35-4.35" strokeLinecap="round" />
       </svg>
@@ -105,15 +109,15 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
           headerHidden ? "-translate-y-full" : "translate-y-0"
         }`}
       >
-        <div className="mx-auto flex max-w-lg items-center justify-between px-4 py-3">
+        <div className="mx-auto flex max-w-lg items-center justify-between gap-2 px-4 py-3">
           {titledRoute ? (
-            <h1 className="text-xl font-bold text-black dark:text-white">{titledRoute.title}</h1>
+            <h1 className="min-w-0 truncate text-xl font-bold text-black dark:text-white">{titledRoute.title}</h1>
           ) : (
-            <span className="bg-brand-gradient bg-clip-text text-[26px] font-black italic tracking-tight text-transparent">
+            <span className="min-w-0 truncate bg-brand-gradient bg-clip-text text-2xl font-extrabold tracking-tight text-transparent">
               Next Social
             </span>
           )}
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
             {titledRoute ? <NotificationIcon count={notifications} /> : <SearchIcon />}
             <AuthHeaderControl />
           </div>
