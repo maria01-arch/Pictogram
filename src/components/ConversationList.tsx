@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useTopLoading } from "./TopLoadingBar";
 import { ConversationListSkeleton } from "./Skeleton";
 import { isOnline } from "@/lib/presence";
+import { isVoiceNotePath } from "@/lib/uploadChatVoice";
 import { hideConversation, reportConversation } from "@/lib/conversationActions";
 import { ensureAiConversation, AI_BOT_USERNAME } from "@/lib/aiBot";
 import { blockUser } from "@/lib/block";
@@ -85,7 +86,13 @@ export default function ConversationList() {
     let activityAt: string | null = lastMessage?.created_at ?? null;
 
     if (lastMessage) {
-      preview = lastMessage.content ?? (lastMessage.media_url ? "📷 Sent a photo" : "Say hello 👋");
+      preview =
+        lastMessage.content ??
+        (lastMessage.media_url
+          ? isVoiceNotePath(lastMessage.media_url)
+            ? "🎤 Voice message"
+            : "📷 Sent a photo"
+          : "Say hello 👋");
     }
 
     if (latestReaction && (!lastMessage || new Date(latestReaction.created_at) > new Date(lastMessage.created_at))) {

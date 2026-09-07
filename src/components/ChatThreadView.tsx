@@ -27,6 +27,22 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 
 const TYPING_TIMEOUT_MS = 2500;
 const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+// Consecutive messages from the same sender within this window are visually
+// grouped together (tighter spacing, ticks/timestamp only on the last one).
+const GROUP_GAP_MS = 60_000;
+
+function formatBubbleTime(iso: string) {
+  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+function Ticks({ seen, light }: { seen: boolean; light?: boolean }) {
+  return (
+    <svg width="13" height="9" viewBox="0 0 16 10" fill="none" className={seen ? "text-brand-from" : light ? "text-white/80" : "text-ink-muted"}>
+      <path d="M1 5l3 3 5-7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M6 5l3 3 6-8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 interface MenuState {
   message: Message;
@@ -521,9 +537,17 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     });
     return grouped;
   }
+  function previewLabel(m: Message | null | undefined): string {
+    if (!m) return "";
+    if (m.content) return m.content;
+    if (m.media_url && isVoiceNotePath(m.media_url)) return "🎤 Voice message";
+    if (m.media_url) return "📷 Photo";
+    return "";
+  }
   function quotedContent(replyToId: string | null) {
     if (!replyToId) return null;
-    return messages.find((m) => m.id === replyToId)?.content ?? null;
+    const target = messages.find((m) => m.id === replyToId);
+    return target ? previewLabel(target) : null;
   }
 
   const canMessage = !blocked.blockedByMe && !blocked.blockedMe;
@@ -568,7 +592,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
       {initialLoading ? (
         <ChatSkeleton />
       ) : (
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-2.5 no-scrollbar">
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2.5 no-scrollbar">
         {messages.length === 0 && otherProfile && (
           <div className="flex flex-col items-center gap-2 py-16 text-center">
             <div className="h-20 w-20 overflow-hidden rounded-full bg-brand-gradient">
@@ -583,17 +607,44 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
             <p className="mt-1 text-sm text-ink-muted">Send the first message 👋😊</p>
           </div>
         )}
-        {messages.map((m) => {
+        {messages.map((m, i) => {
           const mine = m.sender_id === userId;
           const grouped = reactionsFor(m.id);
           const quote = quotedContent(m.reply_to_id);
           const canShowReadReceipts = myReadReceiptsEnabled && (otherProfile?.read_receipts_enabled ?? true);
           const seen = canShowReadReceipts && !!otherLastReadAt && m.created_at <= otherLastReadAt;
 
+          const prev = messages[i - 1];
+          const next = messages[i + 1];
+          const groupedWithPrev =
+            !!prev && prev.sender_id === m.sender_id && new Date(m.created_at).getTime() - new Date(prev.created_at).getTime() < GROUP_GAP_MS;
+          const isLastInGroup =
+            !next || next.sender_id !== m.sender_id || new Date(next.created_at).getTime() - new Date(m.created_at).getTime() >= GROUP_GAP_MS;
+
+          const timeLabel = formatBubbleTime(m.created_at);
+          // Inline meta (time + ticks) rendered *inside* text/caption content
+          // via float, so it tucks in next to the last line instead of
+          // adding a new row — the classic WhatsApp trick.
+          const inlineMeta = isLastInGroup ? (
+            <span className={`float-right ml-2 mt-1 flex items-center gap-1 text-[10px] ${mine ? "text-white/80" : "text-ink-muted"}`}>
+              {timeLabel}
+              {mine && <Ticks seen={seen} />}
+            </span>
+          ) : null;
+          // Overlay meta for media/emoji bubbles that have no wrappable text
+          // flow to float into — an absolutely positioned badge instead,
+          // which never changes the bubble's size.
+          const overlayMeta = isLastInGroup ? (
+            <span className="pointer-events-none absolute bottom-1.5 right-2 flex items-center gap-1 rounded-full bg-black/45 px-1.5 py-0.5 text-[10px] text-white">
+              {timeLabel}
+              {mine && <Ticks seen={seen} light />}
+            </span>
+          ) : null;
+
           return (
             <div
               key={m.id}
-              className={`flex flex-col ${mine ? "items-end" : "items-start"}`}
+              className={`flex flex-col ${mine ? "items-end" : "items-start"} ${groupedWithPrev ? "mt-0.5" : "mt-2"}`}
               onTouchStart={handleRowTouchStart}
               onTouchMove={(e) => handleRowTouchMove(m, e)}
               onTouchEnd={() => handleRowTouchEnd(m)}
@@ -621,7 +672,18 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
                   onTouchMove={cancelLongPress}
                   onContextMenu={(e) => { e.preventDefault(); setMenu({ message: m, x: e.clientX, y: e.clientY }); }}
                 >
-                  <ChatVoiceNote path={m.media_url} mine={mine} />
+                  <ChatVoiceNote
+                    path={m.media_url}
+                    mine={mine}
+                    meta={
+                      isLastInGroup ? (
+                        <span className={`flex items-center gap-1 text-[10px] ${mine ? "text-white/80" : "text-ink-muted"}`}>
+                          {timeLabel}
+                          {mine && <Ticks seen={seen} />}
+                        </span>
+                      ) : null
+                    }
+                  />
                 </div>
               ) : m.media_url ? (
                 <div
@@ -629,17 +691,20 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
                   onTouchEnd={cancelLongPress}
                   onTouchMove={cancelLongPress}
                   onContextMenu={(e) => { e.preventDefault(); setMenu({ message: m, x: e.clientX, y: e.clientY }); }}
-                  className="max-w-[65%] overflow-hidden rounded-2xl border border-black/10 dark:border-white/15"
+                  className="relative max-w-[65%] overflow-hidden rounded-2xl border border-black/10 dark:border-white/15"
                 >
                   <ChatImage path={m.media_url} onTap={handleImageTap} />
-                  {m.content && (
+                  {m.content ? (
                     <p
                       className={`whitespace-pre-wrap break-words px-3 py-2 text-[15px] leading-snug ${
                         mine ? "bg-brand-gradient text-white" : "bg-black/5 dark:bg-white/10"
                       }`}
                     >
                       {m.content}
+                      {inlineMeta}
                     </p>
+                  ) : (
+                    overlayMeta
                   )}
                 </div>
               ) : m.content && isSingleEmoji(m.content) && !quote ? (
@@ -648,9 +713,10 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
                   onTouchEnd={cancelLongPress}
                   onTouchMove={cancelLongPress}
                   onContextMenu={(e) => { e.preventDefault(); setMenu({ message: m, x: e.clientX, y: e.clientY }); }}
-                  className="select-none px-1 py-1"
+                  className="relative select-none px-1 py-1"
                 >
                   <EmojiText text={m.content} size={44} />
+                  {overlayMeta}
                 </div>
               ) : (
                 <div
@@ -669,25 +735,11 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
                   )}
                   {m.content && <EmojiText text={m.content} size={18} />}
                   {m.edited_at && <span className="ml-1.5 text-[10px] opacity-60">(edited)</span>}
+                  {inlineMeta}
                 </div>
               )}
               </div>
               </div>
-
-              {mine && (
-                <div className="mt-0.5 flex items-center gap-1 px-1">
-                  <svg
-                    width="14"
-                    height="10"
-                    viewBox="0 0 16 10"
-                    fill="none"
-                    className={seen ? "text-brand-from" : "text-ink-muted"}
-                  >
-                    <path d="M1 5l3 3 5-7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M6 5l3 3 6-8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-              )}
 
               {Object.keys(grouped).length > 0 && (
                 <div className="mt-0.5 flex gap-1">
@@ -708,7 +760,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
       {replyingTo && (
         <div className="flex items-center gap-2 border-t border-black/5 px-3 py-1.5 dark:border-white/5">
           <div className="min-w-0 flex-1 border-l-2 border-brand-from pl-2 text-xs text-ink-muted">
-            <p className="truncate">Replying to: {replyingTo.content}</p>
+            <p className="truncate">Replying to: {previewLabel(replyingTo)}</p>
           </div>
           <button onClick={() => setReplyingTo(null)} className="text-ink-muted">✕</button>
         </div>

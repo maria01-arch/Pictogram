@@ -14,9 +14,11 @@ const MESSAGES: Record<Notification["type"], (username: string) => string> = {
   message: (u) => `${u} sent you a message`,
   follow_request: (u) => `${u} wants to follow you`,
   follow_accepted: (u) => `${u} accepted your follow request`,
+  account_strike: () => `Your account received a strike — tap to see details`,
 };
 
 function linkFor(n: Notification): string {
+  if (n.type === "account_strike") return "/profile/account-health";
   if (n.type === "message" && n.conversation_id) return `/chat/${n.conversation_id}`;
   if ((n.type === "follow_request" || n.type === "follow_accepted")) return "/friends";
   if (n.profiles) return `/profile/${(n.profiles as any).username}`;

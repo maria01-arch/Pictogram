@@ -10,7 +10,7 @@ function fmt(sec: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export default function ChatVoiceNote({ path, mine }: { path: string; mine: boolean }) {
+export default function ChatVoiceNote({ path, mine, meta }: { path: string; mine: boolean; meta?: React.ReactNode }) {
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -103,9 +103,12 @@ export default function ChatVoiceNote({ path, mine }: { path: string; mine: bool
         <div className={`h-1 w-full overflow-hidden rounded-full ${mine ? "bg-white/30" : "bg-black/10 dark:bg-white/20"}`}>
           <div className={`h-full rounded-full ${mine ? "bg-white" : "bg-brand-from"}`} style={{ width: `${progress * 100}%` }} />
         </div>
-        <p className={`mt-1 text-[11px] tabular-nums ${mine ? "text-white/80" : "text-ink-muted"}`}>
-          {fmt(playing || current > 0 ? current : duration)}
-        </p>
+        <div className="mt-1 flex items-center justify-between gap-2">
+          <p className={`text-[11px] tabular-nums ${mine ? "text-white/80" : "text-ink-muted"}`}>
+            {fmt(playing || current > 0 ? current : duration)}
+          </p>
+          {meta}
+        </div>
       </div>
     </div>
   );

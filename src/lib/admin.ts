@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { createNotification } from "./notifications";
 import type { VerificationApplication } from "@/types/database";
 
 export async function checkIsAdmin(): Promise<boolean> {
@@ -89,4 +90,58 @@ export async function reviewApplication(
       .eq("id", application.user_id);
     if (verifyError) throw verifyError;
   }
+}
+
+export interface ReportRow {
+  id: string;
+  reporter_id: string;
+  reported_user_id: string;
+  conversation_id: string | null;
+  reason: string | null;
+  status: "open" | "actioned" | "dismissed";
+  created_at: string;
+  reporter?: { username: string } | null;
+  reported?: { username: string } | null;
+}
+
+export async function getOpenReports(): Promise<ReportRow[]> {
+  const { data, error } = await supabase
+    .from("reports")
+    .select("*, reporter:profiles!reports_reporter_id_fkey(username), reported:profiles!reports_reported_user_id_fkey(username)")
+    .eq("status", "open")
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function dismissReport(reportId: string) {
+  const { error } = await supabase.from("reports").update({ status: "dismissed" }).eq("id", reportId);
+  if (error) throw error;
+}
+
+// Issues a strike against the reported user, marks the report actioned, and
+// notifies the struck user — all three steps happen together so a report
+// can't silently get actioned without the user ever finding out.
+export async function issueStrikeFromReport(
+  report: Pick<ReportRow, "id" | "reported_user_id">,
+  guidelineViolated: string,
+  reason: string
+) {
+  const { error: strikeError } = await supabase.from("account_strikes").insert({
+    user_id: report.reported_user_id,
+    guideline_violated: guidelineViolated,
+    reason,
+  });
+  if (strikeError) throw strikeError;
+
+  const { error: reportError } = await supabase.from("reports").update({ status: "actioned" }).eq("id", report.id);
+  if (reportError) throw reportError;
+
+  await createNotification({
+    targetUserId: report.reported_user_id,
+    type: "account_strike",
+    pushTitle: "Account notice",
+    pushBody: "Your account received a strike for violating community guidelines.",
+    pushUrl: "/profile/account-health",
+  });
 }

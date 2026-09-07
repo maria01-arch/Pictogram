@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import AuthHeaderControl from "./AuthHeaderControl";
-import Logo from "./Logo";
 import { useBadgeCounts } from "@/lib/useBadgeCounts";
 import { usePresenceHeartbeat } from "@/lib/usePresenceHeartbeat";
 
@@ -110,14 +109,9 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
           {titledRoute ? (
             <h1 className="text-xl font-bold text-black dark:text-white">{titledRoute.title}</h1>
           ) : (
-            <div className="flex items-center gap-2">
-              <div className="rounded-full bg-brand-gradient p-1.5 shadow-[0_2px_10px_-2px_rgba(23,195,236,0.6)]">
-                <Logo height={18} />
-              </div>
-              <span className="text-base font-bold tracking-tight text-black dark:text-white">
-                Next Social
-              </span>
-            </div>
+            <span className="bg-brand-gradient bg-clip-text text-[26px] font-black italic tracking-tight text-transparent">
+              Next Social
+            </span>
           )}
           <div className="flex items-center gap-1">
             {titledRoute ? <NotificationIcon count={notifications} /> : <SearchIcon />}
@@ -149,17 +143,18 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`relative flex flex-col items-center gap-0.5 px-4 py-1 transition active:scale-95 ${
-                  isActive ? "text-brand-from" : "text-ink-muted hover:text-brand-from"
+                aria-label={item.label}
+                className={`relative flex items-center justify-center px-6 py-3 transition active:scale-95 ${
+                  isActive ? "text-brand-from" : "text-ink-muted"
                 }`}
               >
-                <span className={`relative rounded-full p-1.5 transition ${isActive ? "bg-brand-from/10" : ""}`}>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.2 : 1.8}>
+                <span className="relative">
+                  <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.3 : 1.8}>
                     <path d={item.icon} strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   <Badge count={navCount} />
                 </span>
-                <span className={`text-[11px] ${isActive ? "font-semibold" : "font-medium"}`}>{item.label}</span>
+                {isActive && <span className="absolute bottom-1 h-[3px] w-6 rounded-full bg-brand-gradient" />}
               </Link>
             );
           })}

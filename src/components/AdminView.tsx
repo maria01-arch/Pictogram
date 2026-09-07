@@ -8,7 +8,11 @@ import {
   getReviewedApplications,
   getSignedDocUrl,
   reviewApplication,
+  getOpenReports,
+  dismissReport,
+  issueStrikeFromReport,
   type PendingApplication,
+  type ReportRow,
 } from "@/lib/admin";
 
 function DocImage({ path }: { path: string | null }) {
@@ -26,9 +30,13 @@ export default function AdminView() {
   const router = useRouter();
   // null = still checking, false = not an admin (redirecting), true = show the panel
   const [allowed, setAllowed] = useState<boolean | null>(null);
-  const [tab, setTab] = useState<"pending" | "reviewed">("pending");
+  const [tab, setTab] = useState<"pending" | "reviewed" | "reports">("pending");
   const [pending, setPending] = useState<PendingApplication[]>([]);
   const [reviewed, setReviewed] = useState<PendingApplication[]>([]);
+  const [reports, setReports] = useState<ReportRow[]>([]);
+  const [strikeFormFor, setStrikeFormFor] = useState<string | null>(null);
+  const [guideline, setGuideline] = useState<Record<string, string>>({});
+  const [strikeReason, setStrikeReason] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -46,9 +54,10 @@ export default function AdminView() {
   }, []);
 
   async function loadAll() {
-    const [p, r] = await Promise.all([getPendingApplications(), getReviewedApplications()]);
+    const [p, r, rep] = await Promise.all([getPendingApplications(), getReviewedApplications(), getOpenReports()]);
     setPending(p);
     setReviewed(r);
+    setReports(rep);
   }
 
   async function handleReview(id: string, status: "approved" | "rejected") {
@@ -65,6 +74,37 @@ export default function AdminView() {
       const message = err instanceof Error ? err.message : JSON.stringify(err);
       setDebugStatus(`❌ Failed on "${status}": ${message}`);
       setError(message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleDismissReport(id: string) {
+    setBusyId(id);
+    try {
+      await dismissReport(id);
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to dismiss report");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleIssueStrike(report: ReportRow) {
+    const g = guideline[report.id]?.trim();
+    const r = strikeReason[report.id]?.trim();
+    if (!g || !r) {
+      setError("Both the guideline and reason are required to issue a strike.");
+      return;
+    }
+    setBusyId(report.id);
+    try {
+      await issueStrikeFromReport(report, g, r);
+      setStrikeFormFor(null);
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to issue strike");
     } finally {
       setBusyId(null);
     }
@@ -98,6 +138,12 @@ export default function AdminView() {
           className={`rounded-full px-4 py-1.5 text-sm font-semibold ${tab === "reviewed" ? "bg-brand-gradient text-white" : "bg-black/5 dark:bg-white/10"}`}
         >
           History
+        </button>
+        <button
+          onClick={() => setTab("reports")}
+          className={`rounded-full px-4 py-1.5 text-sm font-semibold ${tab === "reports" ? "bg-brand-gradient text-white" : "bg-black/5 dark:bg-white/10"}`}
+        >
+          Reports ({reports.length})
         </button>
       </div>
 
@@ -156,6 +202,67 @@ export default function AdminView() {
                 <span className={app.status === "approved" ? "text-green-500" : "text-red-500"}>{app.status}</span>
               </p>
               {app.reviewer_notes && <p className="mt-1 text-ink-muted">{app.reviewer_notes}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+      {tab === "reports" && (
+        <div className="mt-4 space-y-4">
+          {reports.length === 0 && <p className="text-sm text-ink-muted">No open reports.</p>}
+          {reports.map((r) => (
+            <div key={r.id} className="rounded-xl2 glass-card p-4">
+              <p className="text-sm font-semibold">
+                {r.reporter?.username ?? "unknown"} reported {r.reported?.username ?? "unknown"}
+              </p>
+              {r.reason && <p className="mt-1 text-sm text-ink-muted">"{r.reason}"</p>}
+              <p className="mt-1 text-xs text-ink-muted">{new Date(r.created_at).toLocaleString()}</p>
+
+              {strikeFormFor === r.id ? (
+                <div className="mt-3 space-y-2">
+                  <input
+                    value={guideline[r.id] ?? ""}
+                    onChange={(e) => setGuideline((g) => ({ ...g, [r.id]: e.target.value }))}
+                    placeholder="Guideline violated (e.g. Harassment)"
+                    className="w-full rounded-xl2 bg-black/5 p-2.5 text-sm outline-none dark:bg-white/10"
+                  />
+                  <textarea
+                    value={strikeReason[r.id] ?? r.reason ?? ""}
+                    onChange={(e) => setStrikeReason((s) => ({ ...s, [r.id]: e.target.value }))}
+                    placeholder="Reason shown to the user"
+                    rows={2}
+                    className="w-full rounded-xl2 bg-black/5 p-2.5 text-sm outline-none dark:bg-white/10"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleIssueStrike(r)}
+                      disabled={busyId === r.id}
+                      className="flex-1 rounded-full bg-red-500 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                    >
+                      Confirm strike
+                    </button>
+                    <button onClick={() => setStrikeFormFor(null)} className="flex-1 rounded-full bg-black/5 py-2 text-sm font-semibold dark:bg-white/10">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => setStrikeFormFor(r.id)}
+                    disabled={busyId === r.id}
+                    className="flex-1 rounded-full bg-red-500 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                  >
+                    Issue strike
+                  </button>
+                  <button
+                    onClick={() => handleDismissReport(r.id)}
+                    disabled={busyId === r.id}
+                    className="flex-1 rounded-full bg-black/5 py-2 text-sm font-semibold dark:bg-white/10"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>

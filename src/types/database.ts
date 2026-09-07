@@ -211,7 +211,7 @@ export interface VerificationApplication {
   created_at: string;
 }
 
-export type NotificationType = "like" | "comment" | "message" | "follow_request" | "follow_accepted";
+export type NotificationType = "like" | "comment" | "message" | "follow_request" | "follow_accepted" | "account_strike";
 
 export interface Notification {
   id: string;
