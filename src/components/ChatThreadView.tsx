@@ -227,8 +227,35 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
 
     channelRef.current = channel;
 
+    // Deliberately a SEPARATE channel from messages/typing above — read
+    // receipts and online status are "nice to have instantly" but message
+    // delivery is not allowed to depend on them. If this channel ever has
+    // trouble, it fails on its own without taking messaging down with it.
+    const metaChannel = supabase
+      .channel(`conversation-meta:${conversationId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "conversation_participants", filter: `conversation_id=eq.${conversationId}` },
+        (payload) => {
+          const row = payload.new as any;
+          if (row.user_id !== user.id) setOtherLastReadAt(row.last_read_at ?? null);
+        }
+      )
+      .on(
+        "postgres_changes",
+        other ? { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${(other as any).profiles.id}` } : { event: "UPDATE", schema: "public", table: "profiles" },
+        (payload) => {
+          if (!other) return;
+          const updated = payload.new as Profile;
+          if (updated.id !== (other as any).profiles.id) return;
+          setOtherProfile((prev) => (prev ? { ...prev, ...updated } : updated));
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(metaChannel);
       if (otherTypingTimeoutRef.current) clearTimeout(otherTypingTimeoutRef.current);
       if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
     };
@@ -630,31 +657,28 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
           const seen = canShowReadReceipts && !!otherLastReadAt && m.created_at <= otherLastReadAt;
 
           const prev = messages[i - 1];
-          const next = messages[i + 1];
           const groupedWithPrev =
             !!prev && prev.sender_id === m.sender_id && new Date(m.created_at).getTime() - new Date(prev.created_at).getTime() < GROUP_GAP_MS;
-          const isLastInGroup =
-            !next || next.sender_id !== m.sender_id || new Date(next.created_at).getTime() - new Date(m.created_at).getTime() >= GROUP_GAP_MS;
 
           const timeLabel = formatBubbleTime(m.created_at);
           // Inline meta (time + ticks) rendered *inside* text/caption content
           // via float, so it tucks in next to the last line instead of
           // adding a new row — the classic WhatsApp trick.
-          const inlineMeta = isLastInGroup ? (
+          const inlineMeta = (
             <span className={`float-right ml-2 mt-1 flex items-center gap-1 text-[10px] ${mine ? "text-white/80" : "text-ink-muted"}`}>
               {timeLabel}
               {mine && <Ticks seen={seen} />}
             </span>
-          ) : null;
+          );
           // Overlay meta for media/emoji bubbles that have no wrappable text
           // flow to float into — an absolutely positioned badge instead,
           // which never changes the bubble's size.
-          const overlayMeta = isLastInGroup ? (
+          const overlayMeta = (
             <span className="pointer-events-none absolute bottom-1.5 right-2 flex items-center gap-1 rounded-full bg-black/45 px-1.5 py-0.5 text-[10px] text-white">
               {timeLabel}
               {mine && <Ticks seen={seen} light />}
             </span>
-          ) : null;
+          );
 
           return (
             <div
@@ -691,12 +715,10 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
                     path={m.media_url}
                     mine={mine}
                     meta={
-                      isLastInGroup ? (
-                        <span className={`flex items-center gap-1 text-[10px] ${mine ? "text-white/80" : "text-ink-muted"}`}>
-                          {timeLabel}
-                          {mine && <Ticks seen={seen} />}
-                        </span>
-                      ) : null
+                      <span className={`flex items-center gap-1 text-[10px] ${mine ? "text-white/80" : "text-ink-muted"}`}>
+                        {timeLabel}
+                        {mine && <Ticks seen={seen} />}
+                      </span>
                     }
                   />
                 </div>

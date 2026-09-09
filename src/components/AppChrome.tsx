@@ -49,9 +49,9 @@ function SearchIcon() {
     <Link
       href="/search"
       aria-label="Search"
-      className="rounded-full bg-brand-from/10 p-2.5 text-brand-from transition hover:bg-brand-from/20"
+      className="rounded-full bg-black/5 p-2.5 text-black backdrop-blur-sm transition hover:bg-black/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
     >
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6">
         <circle cx="11" cy="11" r="7" />
         <path d="M21 21l-4.35-4.35" strokeLinecap="round" />
       </svg>

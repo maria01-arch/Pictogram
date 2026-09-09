@@ -17,9 +17,9 @@ export default function AuthHeaderControl() {
     <Link
       href="/menu"
       aria-label="Open menu"
-      className="rounded-full bg-brand-to/10 p-2.5 text-brand-to transition hover:bg-brand-to/20"
+      className="rounded-full bg-black/5 p-2.5 text-black backdrop-blur-sm transition hover:bg-black/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
     >
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6">
         <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
       </svg>
     </Link>
