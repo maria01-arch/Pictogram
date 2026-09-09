@@ -21,6 +21,7 @@ const TITLED_ROUTES: { prefix: string; title: string }[] = [
   { prefix: "/friends", title: "Friends" },
   { prefix: "/create", title: "Create" },
   { prefix: "/menu", title: "Menu" },
+  { prefix: "/gallery", title: "Gallery" },
 ];
 
 function Badge({ count }: { count: number }) {

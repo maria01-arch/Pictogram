@@ -40,6 +40,12 @@ const SECTIONS: { title: string; items: MenuItem[] }[] = [
         description: "Posts you've bookmarked",
         icon: "M6 3h12a1 1 0 011 1v17l-7-4-7 4V4a1 1 0 011-1z",
       },
+      {
+        href: "/gallery",
+        label: "Gallery",
+        description: "Discover, download, and share wallpapers",
+        icon: "M4 5h16v14H4V5zm3 11l4-5 3 3 3-4 3 6H7z",
+      },
     ],
   },
   {

@@ -25,6 +25,10 @@ const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 // Resolves a chat-media storage path to a signed URL, valid for 1 hour.
 // Cached in-memory so re-rendering the same message doesn't re-request it.
 export async function resolveChatMediaUrl(path: string): Promise<string | null> {
+  // Gallery images sent to chat store the real external URL directly
+  // (they're not in our own storage) — nothing to sign, just use it as-is.
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+
   const cached = signedUrlCache.get(path);
   if (cached && cached.expiresAt > Date.now()) return cached.url;
 
