@@ -24,6 +24,8 @@ export default function WallpaperViewer({
   useScrollLock();
   const [index, setIndex] = useState(startIndex);
   const [fullLoaded, setFullLoaded] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const [downloading, setDownloading] = useState(false);
   const [sending, setSending] = useState(false);
   const [favBusy, setFavBusy] = useState(false);
@@ -34,7 +36,18 @@ export default function WallpaperViewer({
 
   useEffect(() => {
     setFullLoaded(false);
+    setLoadFailed(false);
+    setRetryKey(0);
   }, [wallpaper.id]);
+
+  // Some full-resolution loads fail silently (no error event at all) rather
+  // than firing onError — a hard timeout catches that case too, instead of
+  // leaving the blurred placeholder up forever with no way out.
+  useEffect(() => {
+    if (fullLoaded || loadFailed) return;
+    const t = setTimeout(() => setLoadFailed(true), 12000);
+    return () => clearTimeout(t);
+  }, [wallpaper.id, retryKey, fullLoaded, loadFailed]);
 
   // Make the phone's/WebView's back button close this viewer instead of
   // navigating the whole app away from the gallery. One history entry per
@@ -126,12 +139,29 @@ export default function WallpaperViewer({
               once it's actually ready. */}
           <img src={wallpaper.thumbs.large} alt="" className="absolute inset-0 h-full w-full scale-105 object-contain blur-lg" />
           <img
-            key={wallpaper.id}
+            key={`${wallpaper.id}-${retryKey}`}
             src={wallpaper.path}
             alt=""
+            referrerPolicy="no-referrer"
             onLoad={() => setFullLoaded(true)}
+            onError={() => setLoadFailed(true)}
             className={`relative max-h-full max-w-full object-contain transition-opacity duration-300 ${fullLoaded ? "opacity-100" : "opacity-0"}`}
           />
+          {loadFailed && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/40">
+              <p className="text-sm text-white/80">Couldn't load this image</p>
+              <button
+                onClick={() => {
+                  setLoadFailed(false);
+                  setFullLoaded(false);
+                  setRetryKey((k) => k + 1);
+                }}
+                className="rounded-full bg-white/20 px-4 py-2 text-sm font-semibold text-white"
+              >
+                Retry
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="safe-bottom flex items-center justify-around gap-2 px-4 py-4">
