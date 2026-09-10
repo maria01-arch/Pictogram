@@ -1,26 +1,67 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Portal from "./Portal";
 import { useScrollLock } from "@/lib/useScrollLock";
 import { addFavorite, removeFavorite, type WallpaperItem } from "@/lib/gallery";
 import SendToChatSheet from "./SendToChatSheet";
 
+const SWIPE_THRESHOLD = 60;
+
 export default function WallpaperViewer({
-  wallpaper,
-  isFavorite,
+  items,
+  startIndex,
+  favoriteIds,
   onFavoriteChange,
   onClose,
 }: {
-  wallpaper: WallpaperItem;
-  isFavorite: boolean;
-  onFavoriteChange: (fav: boolean) => void;
+  items: WallpaperItem[];
+  startIndex: number;
+  favoriteIds: Set<string>;
+  onFavoriteChange: (item: WallpaperItem, fav: boolean) => void;
   onClose: () => void;
 }) {
   useScrollLock();
+  const [index, setIndex] = useState(startIndex);
+  const [fullLoaded, setFullLoaded] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [sending, setSending] = useState(false);
   const [favBusy, setFavBusy] = useState(false);
+  const touchStartY = useRef<number | null>(null);
+
+  const wallpaper = items[index];
+  const isFavorite = favoriteIds.has(wallpaper.id);
+
+  useEffect(() => {
+    setFullLoaded(false);
+  }, [wallpaper.id]);
+
+  // Make the phone's/WebView's back button close this viewer instead of
+  // navigating the whole app away from the gallery. One history entry per
+  // open — swiping between images doesn't touch history, only opening and
+  // closing does, so back always takes exactly one press to fully exit.
+  useEffect(() => {
+    window.history.pushState({ pictogramModal: "wallpaper" }, "");
+    const onPopState = () => onClose();
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function handleClose() {
+    window.history.back(); // triggers the popstate handler above, which calls onClose
+  }
+
+  function handleTouchStart(e: React.TouchEvent) {
+    touchStartY.current = e.touches[0].clientY;
+  }
+  function handleTouchEnd(e: React.TouchEvent) {
+    if (touchStartY.current === null) return;
+    const dy = e.changedTouches[0].clientY - touchStartY.current;
+    touchStartY.current = null;
+    if (dy < -SWIPE_THRESHOLD && index < items.length - 1) setIndex((i) => i + 1);
+    else if (dy > SWIPE_THRESHOLD && index > 0) setIndex((i) => i - 1);
+  }
 
   async function handleDownload() {
     setDownloading(true);
@@ -50,10 +91,10 @@ export default function WallpaperViewer({
     try {
       if (isFavorite) {
         await removeFavorite(wallpaper.id);
-        onFavoriteChange(false);
+        onFavoriteChange(wallpaper, false);
       } else {
         await addFavorite(wallpaper);
-        onFavoriteChange(true);
+        onFavoriteChange(wallpaper, true);
       }
     } catch {
       alert("Something went wrong. Try again.");
@@ -66,7 +107,7 @@ export default function WallpaperViewer({
     <Portal>
       <div className="fixed inset-0 z-[60] flex flex-col bg-black" style={{ height: "100dvh" }}>
         <div className="safe-top flex items-center justify-between px-4 py-3">
-          <button onClick={onClose} className="text-white" aria-label="Close">
+          <button onClick={handleClose} className="text-white" aria-label="Close">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
             </svg>
@@ -74,8 +115,23 @@ export default function WallpaperViewer({
           <span className="text-xs text-white/60">{wallpaper.resolution}</span>
         </div>
 
-        <div className="flex flex-1 items-center justify-center overflow-hidden px-2">
-          <img src={wallpaper.path} alt="" className="max-h-full max-w-full object-contain" />
+        <div
+          className="relative flex flex-1 items-center justify-center overflow-hidden px-2"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          {/* Instant blurred placeholder from the grid thumbnail (already
+              loaded/cached from browsing) so this never shows solid black,
+              even on a slow connection — the full-res image fades in over it
+              once it's actually ready. */}
+          <img src={wallpaper.thumbs.large} alt="" className="absolute inset-0 h-full w-full scale-105 object-contain blur-lg" />
+          <img
+            key={wallpaper.id}
+            src={wallpaper.path}
+            alt=""
+            onLoad={() => setFullLoaded(true)}
+            className={`relative max-h-full max-w-full object-contain transition-opacity duration-300 ${fullLoaded ? "opacity-100" : "opacity-0"}`}
+          />
         </div>
 
         <div className="safe-bottom flex items-center justify-around gap-2 px-4 py-4">

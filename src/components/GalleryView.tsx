@@ -18,7 +18,7 @@ export default function GalleryView() {
   const [favorites, setFavorites] = useState<FavoriteRow[]>([]);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
 
-  const [viewing, setViewing] = useState<WallpaperItem | null>(null);
+  const [viewingIndex, setViewingIndex] = useState<number | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const seedRef = useRef(Math.random().toString(36).slice(2, 10));
 
@@ -93,6 +93,16 @@ export default function GalleryView() {
       ? items.map((w) => ({ id: w.id, thumb: w.thumbs.large, path: w.path, resolution: w.resolution }))
       : favorites.map((f) => ({ id: f.wallhaven_id, thumb: f.thumb_url, path: f.full_url, resolution: f.resolution ?? "" }));
 
+  // One consistent WallpaperItem[] for whichever tab is showing, so the
+  // viewer can swipe vertically across exactly what's on screen.
+  const viewerItems: WallpaperItem[] = displayed.map((d) => ({
+    id: d.id,
+    path: d.path,
+    thumbs: { small: d.thumb, large: d.thumb, original: d.thumb },
+    resolution: d.resolution,
+    file_size: 0,
+  }));
+
   return (
     <div className="px-3 py-3">
       <form onSubmit={handleSearchSubmit} className="flex gap-2">
@@ -132,26 +142,13 @@ export default function GalleryView() {
         </p>
       ) : (
         <div className="mt-3 columns-2 gap-2">
-          {displayed.map((d) => (
+          {displayed.map((d, i) => (
             <button
               key={d.id}
-              onClick={() => {
-                const full = tab === "browse" ? items.find((w) => w.id === d.id) : null;
-                if (full) setViewing(full);
-                else {
-                  // Favorites tab: reconstruct enough of a WallpaperItem to view/act on.
-                  setViewing({
-                    id: d.id,
-                    path: d.path,
-                    thumbs: { small: d.thumb, large: d.thumb, original: d.thumb },
-                    resolution: d.resolution,
-                    file_size: 0,
-                  });
-                }
-              }}
-              className="mb-2 block w-full break-inside-avoid overflow-hidden rounded-xl2 bg-black/5 dark:bg-white/10"
+              onClick={() => setViewingIndex(i)}
+              className="mb-2 block aspect-[9/16] w-full break-inside-avoid overflow-hidden rounded-xl2 bg-black/5 dark:bg-white/10"
             >
-              <img src={d.thumb} alt="" className="w-full object-cover" loading="lazy" />
+              <img src={d.thumb} alt="" className="h-full w-full object-cover" loading="lazy" />
             </button>
           ))}
         </div>
@@ -160,12 +157,13 @@ export default function GalleryView() {
       {tab === "browse" && <div ref={sentinelRef} className="h-1" />}
       {loadingMore && <p className="py-4 text-center text-xs text-ink-muted">Loading more…</p>}
 
-      {viewing && (
+      {viewingIndex !== null && (
         <WallpaperViewer
-          wallpaper={viewing}
-          isFavorite={favoriteIds.has(viewing.id)}
-          onFavoriteChange={(fav) => handleFavoriteChange(viewing, fav)}
-          onClose={() => setViewing(null)}
+          items={viewerItems}
+          startIndex={viewingIndex}
+          favoriteIds={favoriteIds}
+          onFavoriteChange={handleFavoriteChange}
+          onClose={() => setViewingIndex(null)}
         />
       )}
     </div>

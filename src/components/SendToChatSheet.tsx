@@ -19,6 +19,18 @@ export default function SendToChatSheet({ imageUrl, onClose }: { imageUrl: strin
   const [sentTo, setSentTo] = useState<string | null>(null);
 
   useEffect(() => {
+    window.history.pushState({ pictogramModal: "send-to-chat" }, "");
+    const onPopState = () => onClose();
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function handleClose() {
+    window.history.back();
+  }
+
+  useEffect(() => {
     (async () => {
       const {
         data: { user },
@@ -48,7 +60,7 @@ export default function SendToChatSheet({ imageUrl, onClose }: { imageUrl: strin
     setSentTo(t.conversationId);
     try {
       await sendWallpaperToChat(t.conversationId, imageUrl);
-      setTimeout(onClose, 700);
+      setTimeout(handleClose, 700);
     } catch {
       setSentTo(null);
       alert("Failed to send. Try again.");
@@ -57,7 +69,7 @@ export default function SendToChatSheet({ imageUrl, onClose }: { imageUrl: strin
 
   return (
     <Portal>
-      <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50" onClick={onClose}>
+      <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50" onClick={handleClose}>
         <div className="safe-bottom max-h-[70vh] w-full max-w-lg overflow-y-auto rounded-t-2xl glass-card" onClick={(e) => e.stopPropagation()}>
           <p className="px-4 pt-4 text-sm font-semibold text-ink-muted">Send to</p>
           {loading ? (
@@ -82,7 +94,7 @@ export default function SendToChatSheet({ imageUrl, onClose }: { imageUrl: strin
               ))}
             </div>
           )}
-          <button onClick={onClose} className="w-full px-4 py-3.5 text-center text-[15px] font-semibold text-ink-muted">
+          <button onClick={handleClose} className="w-full px-4 py-3.5 text-center text-[15px] font-semibold text-ink-muted">
             Cancel
           </button>
         </div>
