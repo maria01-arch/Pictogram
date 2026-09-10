@@ -13,8 +13,9 @@ export interface GalleryPage {
   meta: { current_page: number; last_page: number };
 }
 
-export async function searchWallpapers(q: string, page: number): Promise<GalleryPage> {
+export async function searchWallpapers(q: string, page: number, seed?: string): Promise<GalleryPage> {
   const params = new URLSearchParams({ q, page: String(page) });
+  if (seed) params.set("seed", seed);
   const res = await fetch(`/api/gallery/search?${params.toString()}`);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Gallery request failed");

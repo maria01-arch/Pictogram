@@ -20,7 +20,12 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const q = searchParams.get("q") ?? "";
   const page = searchParams.get("page") ?? "1";
-  const sorting = searchParams.get("sorting") ?? (q ? "relevance" : "toplist");
+  const seed = searchParams.get("seed") ?? "";
+  // Default browsing (no search term) uses random sorting with a
+  // client-persisted seed — Wallhaven then walks forward through a large
+  // shuffled set page after page instead of one fixed, finite ranking, so
+  // scrolling genuinely doesn't run out the way a single fixed list would.
+  const sorting = searchParams.get("sorting") ?? (q ? "relevance" : "random");
 
   function buildParams(strict: boolean) {
     const p = new URLSearchParams({
@@ -34,12 +39,14 @@ export async function GET(request: Request) {
       purity: "100",
       categories: "111",
     });
+    if (sorting === "random" && seed) p.set("seed", seed);
     if (strict) {
       // This is a phone wallpaper gallery — bias toward portrait ratios
       // that actually fill a phone screen instead of wide desktop
-      // wallpapers that show up tiny and letterboxed.
+      // wallpapers that show up tiny and letterboxed. Deliberately NOT
+      // combined with a minimum-resolution filter — stacking both shrank
+      // the pool enough that searches ran out of results almost immediately.
       p.set("ratios", "9x16,9x18,9x19,9x20,10x16,1x2");
-      p.set("atleast", "1080x1920");
     }
     return p;
   }

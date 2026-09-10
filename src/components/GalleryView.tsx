@@ -20,6 +20,7 @@ export default function GalleryView() {
 
   const [viewing, setViewing] = useState<WallpaperItem | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const seedRef = useRef(Math.random().toString(36).slice(2, 10));
 
   const loadFavorites = useCallback(async () => {
     try {
@@ -38,7 +39,7 @@ export default function GalleryView() {
   const runSearch = useCallback(async (q: string, pageNum: number) => {
     setError(null);
     try {
-      const result = await searchWallpapers(q, pageNum);
+      const result = await searchWallpapers(q, pageNum, seedRef.current);
       setItems((prev) => (pageNum === 1 ? result.data : [...prev, ...result.data]));
       setHasMore(result.meta.current_page < result.meta.last_page);
       setPage(pageNum);
