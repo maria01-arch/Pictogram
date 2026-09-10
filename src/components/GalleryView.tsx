@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { searchWallpapers, getFavorites, type WallpaperItem, type FavoriteRow } from "@/lib/gallery";
 import WallpaperViewer from "./WallpaperViewer";
+import { GallerySkeleton } from "./Skeleton";
 
 export default function GalleryView() {
   const [tab, setTab] = useState<"browse" | "favorites">("browse");
@@ -123,7 +124,7 @@ export default function GalleryView() {
       {error && <p className="mt-4 text-center text-sm text-red-500">{error}</p>}
 
       {loading ? (
-        <p className="mt-8 text-center text-sm text-ink-muted">Loading…</p>
+        <GallerySkeleton />
       ) : displayed.length === 0 ? (
         <p className="mt-8 text-center text-sm text-ink-muted">
           {tab === "favorites" ? "No favorites yet — tap the heart on any wallpaper." : "No results."}

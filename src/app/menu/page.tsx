@@ -112,7 +112,7 @@ export default function MenuPage() {
     <div className="px-4 pb-10 pt-4">
       <h2 className="text-lg font-bold">Menu</h2>
 
-      {profile && (
+      {profile ? (
         <Link
           href={`/profile/${profile.username}`}
           className="mt-4 flex items-center gap-4 rounded-xl2 glass-card p-4 transition hover:bg-black/5 dark:hover:bg-white/5"
@@ -128,6 +128,14 @@ export default function MenuPage() {
             <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </Link>
+      ) : (
+        <div className="mt-4 flex items-center gap-4 rounded-xl2 glass-card p-4">
+          <div className="h-16 w-16 shrink-0 animate-pulse rounded-full bg-black/10 dark:bg-white/10" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="h-4 w-32 animate-pulse rounded bg-black/10 dark:bg-white/10" />
+            <div className="h-3 w-44 animate-pulse rounded bg-black/10 dark:bg-white/10" />
+          </div>
+        </div>
       )}
 
       {SECTIONS.map((section) => (

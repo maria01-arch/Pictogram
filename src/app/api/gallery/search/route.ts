@@ -22,28 +22,47 @@ export async function GET(request: Request) {
   const page = searchParams.get("page") ?? "1";
   const sorting = searchParams.get("sorting") ?? (q ? "relevance" : "toplist");
 
-  const params = new URLSearchParams({
-    apikey: apiKey,
-    q,
-    page,
-    sorting,
-    order: "desc",
-    // Hardcoded, never accepted from the client — SFW only. This is a
-    // deliberate product decision, not a default meant to be overridden.
-    purity: "100",
-    categories: "111",
-  });
+  function buildParams(strict: boolean) {
+    const p = new URLSearchParams({
+      apikey: apiKey!,
+      q,
+      page,
+      sorting,
+      order: "desc",
+      // Hardcoded, never accepted from the client — SFW only. This is a
+      // deliberate product decision, not a default meant to be overridden.
+      purity: "100",
+      categories: "111",
+    });
+    if (strict) {
+      // This is a phone wallpaper gallery — bias toward portrait ratios
+      // that actually fill a phone screen instead of wide desktop
+      // wallpapers that show up tiny and letterboxed.
+      p.set("ratios", "9x16,9x18,9x19,9x20,10x16,1x2");
+      p.set("atleast", "1080x1920");
+    }
+    return p;
+  }
+
+  async function runSearch(strict: boolean) {
+    const res = await fetch(`${WALLHAVEN_URL}?${buildParams(strict).toString()}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(`Wallhaven ${res.status}: ${JSON.stringify(data)}`);
+    return data;
+  }
 
   try {
-    const res = await fetch(`${WALLHAVEN_URL}?${params.toString()}`);
-    const data = await res.json();
-    if (!res.ok) {
-      console.error("Wallhaven error:", res.status, JSON.stringify(data));
-      return NextResponse.json({ error: "Gallery request failed" }, { status: 502 });
+    let data = await runSearch(true);
+    // If the portrait-ratio filter turns up nothing (e.g. a very specific
+    // search term with no matching portrait results, or Wallhaven not
+    // recognizing one of the ratio values), fall back to an unfiltered
+    // search rather than showing the user an empty page.
+    if (!data?.data || data.data.length === 0) {
+      data = await runSearch(false);
     }
     return NextResponse.json(data);
   } catch (err) {
-    console.error("Wallhaven request threw:", err);
+    console.error("Wallhaven request failed:", err);
     return NextResponse.json({ error: "Gallery request failed" }, { status: 502 });
   }
 }

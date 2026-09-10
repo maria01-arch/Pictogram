@@ -1,5 +1,7 @@
-export function SkeletonBlock({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded-md bg-black/10 dark:bg-white/10 ${className}`} />;
+import type { CSSProperties } from "react";
+
+export function SkeletonBlock({ className = "", style }: { className?: string; style?: CSSProperties }) {
+  return <div className={`animate-pulse rounded-md bg-black/10 dark:bg-white/10 ${className}`} style={style} />;
 }
 
 export function SkeletonCircle({ size = 40 }: { size?: number }) {
@@ -58,6 +60,19 @@ export function ListRowSkeleton() {
     <div className="mb-2 flex items-center gap-3 rounded-xl2 glass-card px-3 py-2.5">
       <SkeletonCircle size={40} />
       <SkeletonBlock className="h-3.5 w-32" />
+    </div>
+  );
+}
+
+// Varied heights so it actually reads as a masonry grid, not a plain list.
+const GALLERY_SKELETON_HEIGHTS = [180, 240, 140, 220, 160, 260, 190, 150];
+
+export function GallerySkeleton() {
+  return (
+    <div className="mt-3 columns-2 gap-2">
+      {GALLERY_SKELETON_HEIGHTS.map((h, i) => (
+        <SkeletonBlock key={i} className="mb-2 w-full rounded-xl2" style={{ height: h }} />
+      ))}
     </div>
   );
 }
