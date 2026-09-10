@@ -6,11 +6,12 @@ import Link from "next/link";
 import AuthHeaderControl from "./AuthHeaderControl";
 import { useBadgeCounts } from "@/lib/useBadgeCounts";
 import { usePresenceHeartbeat } from "@/lib/usePresenceHeartbeat";
+import { supabase } from "@/lib/supabaseClient";
 
 const NAV_ITEMS = [
   { href: "/", label: "Home", icon: "M3 11l9-8 9 8M5 10v10h14V10" },
   { href: "/chat", label: "Chat", icon: "M21 11.5a8.38 8.38 0 01-8.5 8.5 8.5 8.5 0 01-4-1L3 20l1-5.5A8.38 8.38 0 0112 3a8.38 8.38 0 019 8.5z" },
-  { href: "/create", label: "Create", icon: "M12 5v14M5 12h14", special: true },
+  { href: "/gallery", label: "Gallery", icon: "M4 5h16v14H4V5zm3 11l4-5 3 3 3-4 3 6H7z" },
   { href: "/friends", label: "Friends", icon: "M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m5-5a4 4 0 100-8 4 4 0 000 8zm7 3a4 4 0 00-3-3.87M4 12.13A4 4 0 017 8.26" },
 ];
 
@@ -60,10 +61,35 @@ function SearchIcon() {
   );
 }
 
+function CreateIcon() {
+  return (
+    <Link
+      href="/create"
+      aria-label="Create"
+      className="rounded-full bg-black/5 p-2.5 text-black backdrop-blur-sm transition hover:bg-black/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
+    >
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6">
+        <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+      </svg>
+    </Link>
+  );
+}
+
 export default function AppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { notifications, chats, friendRequests } = useBadgeCounts();
   usePresenceHeartbeat();
+  const [ownProfile, setOwnProfile] = useState<{ username: string; avatar_url: string | null } | null>(null);
+  useEffect(() => {
+    (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase.from("profiles").select("username, avatar_url").eq("id", user.id).single();
+      if (data) setOwnProfile(data);
+    })();
+  }, []);
   const isAuthPage = pathname?.startsWith("/auth");
   const isChatThread = pathname?.startsWith("/chat/");
   const isProfilePage =
@@ -119,7 +145,14 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
             </span>
           )}
           <div className="flex shrink-0 items-center gap-1">
-            {titledRoute ? <NotificationIcon count={notifications} /> : <SearchIcon />}
+            {titledRoute ? (
+              <NotificationIcon count={notifications} />
+            ) : (
+              <>
+                <SearchIcon />
+                <CreateIcon />
+              </>
+            )}
             <AuthHeaderControl />
           </div>
         </div>
@@ -133,23 +166,12 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
           {NAV_ITEMS.map((item) => {
             const navCount = item.href === "/chat" ? chats : item.href === "/friends" ? friendRequests : 0;
             const isActive = item.href === "/" ? pathname === "/" : pathname?.startsWith(item.href);
-            return item.special ? (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="-mt-4 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-gradient text-white shadow-[0_6px_18px_-4px_rgba(37,71,244,0.55)] transition active:scale-95"
-                aria-label={item.label}
-              >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                  <path d={item.icon} strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </Link>
-            ) : (
+            return (
               <Link
                 key={item.href}
                 href={item.href}
                 aria-label={item.label}
-                className={`relative flex items-center justify-center px-6 py-3 transition active:scale-95 ${
+                className={`relative flex items-center justify-center px-5 py-3 transition active:scale-95 ${
                   isActive ? "text-brand-from" : "text-ink-muted"
                 }`}
               >
@@ -163,6 +185,26 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
+
+          {(() => {
+            const isActive = !!ownProfile && pathname === `/profile/${ownProfile.username}`;
+            return (
+              <Link
+                href={ownProfile ? `/profile/${ownProfile.username}` : "/menu"}
+                aria-label="Profile"
+                className="relative flex items-center justify-center px-5 py-3 transition active:scale-95"
+              >
+                <span
+                  className={`block h-6 w-6 overflow-hidden rounded-full bg-brand-gradient ${
+                    isActive ? "ring-2 ring-brand-from ring-offset-1 ring-offset-surface-light dark:ring-offset-surface-dark" : ""
+                  }`}
+                >
+                  {ownProfile?.avatar_url && <img src={ownProfile.avatar_url} alt="" className="h-full w-full object-cover" />}
+                </span>
+                {isActive && <span className="absolute bottom-1 h-[3px] w-6 rounded-full bg-brand-gradient" />}
+              </Link>
+            );
+          })()}
         </div>
       </nav>
       )}
