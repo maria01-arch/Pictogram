@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
+import { syncCurrentAccountIntoStash } from "@/lib/accountSwitcher";
 
 export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const router = useRouter();
+  const isAddingAccount = useSearchParams().get("add") === "1";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
@@ -37,8 +39,14 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
         if (error) throw error;
         setNotice("Check your email to confirm your account, then log in.");
       } else {
+        // If someone's already signed in (the "add another account" flow),
+        // save their session before it gets overwritten below.
+        await syncCurrentAccountIntoStash();
+
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+
+        await syncCurrentAccountIntoStash();
         router.push("/");
         router.refresh();
       }
@@ -55,7 +63,7 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
         Next Social
       </h1>
       <p className="mt-1 text-sm text-ink-muted">
-        {mode === "login" ? "Welcome back." : "Create your account."}
+        {isAddingAccount ? "Log in to add another account." : mode === "login" ? "Welcome back." : "Create your account."}
       </p>
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-3">

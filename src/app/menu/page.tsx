@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import AccountSwitcherSheet from "@/components/AccountSwitcherSheet";
+import { clearAccountStash } from "@/lib/accountSwitcher";
 
 interface MenuItem {
   href: string;
@@ -93,6 +95,7 @@ const SECTIONS: { title: string; items: MenuItem[] }[] = [
 export default function MenuPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<{ username: string; avatar_url: string | null; display_name: string | null } | null>(null);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
@@ -104,6 +107,7 @@ export default function MenuPage() {
 
   async function handleLogout() {
     await supabase.auth.signOut();
+    clearAccountStash();
     router.push("/auth/login");
     router.refresh();
   }
@@ -136,6 +140,23 @@ export default function MenuPage() {
             <div className="h-3 w-44 animate-pulse rounded bg-black/10 dark:bg-white/10" />
           </div>
         </div>
+      )}
+
+      {profile && (
+        <button
+          onClick={() => setSwitcherOpen(true)}
+          className="mt-2 flex w-full items-center gap-3 rounded-xl2 glass-card px-4 py-3 text-left transition hover:bg-black/5 dark:hover:bg-white/5"
+        >
+          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-black/5 dark:bg-white/10">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+              <path d="M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <span className="flex-1 text-sm font-semibold">Switch account</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="shrink-0 text-ink-muted">
+            <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+          </svg>
+        </button>
       )}
 
       {SECTIONS.map((section) => (
@@ -182,6 +203,8 @@ export default function MenuPage() {
       >
         Log out
       </button>
+
+      {switcherOpen && <AccountSwitcherSheet onClose={() => setSwitcherOpen(false)} />}
     </div>
   );
 }
