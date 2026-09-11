@@ -11,11 +11,13 @@ export default function ReadMoreText({
   limit = 140,
   className = "",
   render,
+  onMore,
 }: {
   text: string;
   limit?: number;
   className?: string;
   render?: (text: string) => ReactNode;
+  onMore?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const isLong = text.length > limit;
@@ -26,10 +28,10 @@ export default function ReadMoreText({
       {render ? render(display) : display}
       {isLong && (
         <button
-          onClick={() => setExpanded((e) => !e)}
+          onClick={() => (onMore ? onMore() : setExpanded((e) => !e))}
           className="ml-1 font-medium text-ink-muted"
         >
-          {expanded ? "less" : "more"}
+          {onMore ? "more" : expanded ? "less" : "more"}
         </button>
       )}
     </span>

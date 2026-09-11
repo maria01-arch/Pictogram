@@ -291,7 +291,7 @@ export default function ConversationList() {
                 >
                   <div className="relative h-11 w-11 shrink-0">
                     <div className="h-11 w-11 overflow-hidden rounded-full bg-brand-gradient">
-                      {c.other_avatar && <img src={c.other_avatar} alt="" className="h-full w-full object-cover" />}
+                      {c.other_avatar && <img src={c.other_avatar} alt="" loading="lazy" className="h-full w-full object-cover" />}
                     </div>
                     {isOnline(c.other_last_seen_at) && (
                       <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-surface-light bg-green-500 dark:border-surface-dark" />

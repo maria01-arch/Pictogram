@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import type { Post } from "@/types/database";
 import TapToPlayVideo from "./TapToPlayVideo";
@@ -28,7 +29,8 @@ function timeAgo(dateString: string): string {
   return "now";
 }
 
-export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: (id: string) => void }) {
+export default function PostCard({ post, onDeleted, fullCaption }: { post: Post; onDeleted?: (id: string) => void; fullCaption?: boolean }) {
+  const router = useRouter();
   const username = post.profiles?.username;
   const [userId, setUserId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -116,8 +118,9 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
             <p className="text-lg font-medium leading-relaxed text-white">
               <ReadMoreText
                 text={post.text_content ?? ""}
-                limit={220}
+                limit={fullCaption ? Infinity : 220}
                 render={(t) => <HashtagText text={t} />}
+                onMore={fullCaption ? undefined : () => router.push(`/post/${post.id}`)}
               />
             </p>
           </div>
@@ -153,7 +156,7 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
           >
             <div className="h-7 w-7 shrink-0 overflow-hidden rounded-full bg-brand-gradient ring-2 ring-white/40">
               {post.profiles?.avatar_url && (
-                <img src={post.profiles.avatar_url} alt="" className="h-full w-full object-cover" />
+                <img src={post.profiles.avatar_url} alt="" loading="lazy" className="h-full w-full object-cover" />
               )}
             </div>
             <span className="flex min-w-0 items-center gap-1 truncate text-xs font-semibold text-white">
@@ -212,7 +215,12 @@ export default function PostCard({ post, onDeleted }: { post: Post; onDeleted?: 
 
       {caption && (
         <p className="px-4 pb-3 text-sm leading-snug">
-          <ReadMoreText text={caption} limit={CAPTION_LIMIT} render={(t) => <HashtagText text={t} />} />
+          <ReadMoreText
+            text={caption}
+            limit={fullCaption ? Infinity : CAPTION_LIMIT}
+            render={(t) => <HashtagText text={t} />}
+            onMore={fullCaption ? undefined : () => router.push(`/post/${post.id}`)}
+          />
         </p>
       )}
 

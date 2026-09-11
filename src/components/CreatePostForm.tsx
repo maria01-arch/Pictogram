@@ -125,7 +125,10 @@ export default function CreatePostForm() {
         {(["post", "story"] as const).map((m) => (
           <button
             key={m}
-            onClick={() => setMode(m)}
+            onClick={() => {
+              setMode(m);
+              if (m === "post") setContentType("media"); // text posts retired — text is still fine for ephemeral stories
+            }}
             className={`flex-1 rounded-full py-2 text-sm font-semibold capitalize transition ${
               mode === m ? "bg-brand-gradient text-white" : "text-ink-muted"
             }`}
@@ -136,19 +139,21 @@ export default function CreatePostForm() {
         ))}
       </div>
 
-      <div className="mb-4 flex gap-2 rounded-full bg-black/5 p-1 dark:bg-white/10">
-        {(["media", "text"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setContentType(t)}
-            className={`flex-1 rounded-full py-1.5 text-xs font-semibold capitalize transition ${
-              contentType === t ? "bg-brand-gradient text-white" : "text-ink-muted"
-            }`}
-          >
-            {t === "media" ? "Photo / Video" : "Text only"}
-          </button>
-        ))}
-      </div>
+      {mode === "story" && (
+        <div className="mb-4 flex gap-2 rounded-full bg-black/5 p-1 dark:bg-white/10">
+          {(["media", "text"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setContentType(t)}
+              className={`flex-1 rounded-full py-1.5 text-xs font-semibold capitalize transition ${
+                contentType === t ? "bg-brand-gradient text-white" : "text-ink-muted"
+              }`}
+            >
+              {t === "media" ? "Photo / Video" : "Text only"}
+            </button>
+          ))}
+        </div>
+      )}
 
       {contentType === "media" ? (
         <>

@@ -205,7 +205,17 @@ export default function ProfileView({ username: rawUsername }: { username: strin
           </div>
         </button>
 
-        <h2 className="mt-3 flex items-center gap-1.5 text-lg font-bold">{profile.display_name ?? profile.username}{profile.is_verified && <VerifiedBadge size={16} />}</h2>
+        <h2 className="mt-3 flex items-center gap-1.5 text-lg font-bold">
+          {profile.display_name ?? profile.username}
+          {profile.is_verified && <VerifiedBadge size={16} />}
+          {isSelf && (
+            <button onClick={() => router.push("/profile/edit")} aria-label="Edit account" className="text-ink-muted">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M11 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2v-5M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          )}
+        </h2>
         <p className="text-sm text-ink-muted">@{profile.username}</p>
         {profile.bio && (
           <p className="mt-2 max-w-xs text-center text-sm">
