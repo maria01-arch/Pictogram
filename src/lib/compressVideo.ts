@@ -7,8 +7,12 @@
  *
  * Instead this re-encodes the source video by piping it through an
  * offscreen <canvas> at a capped resolution/framerate and re-recording it
- * with the native MediaRecorder API (VP9, falling back to VP8). It's a
- * lighter, "good enough" compression pass for short-form social clips.
+ * with the native MediaRecorder API (VP9+Opus, falling back to VP8/no-codec-
+ * hint). It's a lighter, "good enough" compression pass for short-form
+ * social clips. Audio is captured separately, straight from the source
+ * <video> element's own captureStream() (not affected by muting it for
+ * autoplay) and mixed in alongside the canvas's video track — a canvas has
+ * no audio of its own, so this step is required, not optional.
  *
  * Trade-off: this runs in real time (a 10s clip takes ~10s to process).
  * For anything beyond short clips, do the heavy encode server-side instead.
@@ -35,7 +39,13 @@ export interface CropRect {
 }
 
 function pickMimeType(): string {
-  const candidates = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
+  const candidates = [
+    "video/webm;codecs=vp9,opus",
+    "video/webm;codecs=vp8,opus",
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8",
+    "video/webm",
+  ];
   for (const type of candidates) {
     if (MediaRecorder.isTypeSupported(type)) return type;
   }
@@ -72,8 +82,21 @@ export async function compressVideo(input: File, crop?: CropRect): Promise<Compr
   if (!ctx) throw new Error("Canvas 2D context unavailable");
 
   const canvasStream = canvas.captureStream(30); // 30fps cap
+  // canvas.captureStream() is video-only by definition — a canvas has no
+  // audio. video.captureStream() grabs the source <video>'s own decoded
+  // audio track directly, independent of its `muted` property (muted only
+  // silences the speaker output, not what's captured), so we can keep the
+  // video muted for reliable autoplay while still pulling real audio out of
+  // it. This was the actual cause of uploaded videos having no sound.
+  const sourceStream: MediaStream | undefined =
+    (video as unknown as { captureStream?: () => MediaStream }).captureStream?.() ??
+    (video as unknown as { mozCaptureStream?: () => MediaStream }).mozCaptureStream?.();
+  const audioTracks = sourceStream?.getAudioTracks() ?? [];
+
+  const combinedStream = new MediaStream([...canvasStream.getVideoTracks(), ...audioTracks]);
+
   const mimeType = pickMimeType();
-  const recorder = new MediaRecorder(canvasStream, {
+  const recorder = new MediaRecorder(combinedStream, {
     mimeType,
     videoBitsPerSecond: TARGET_BITRATE,
   });
