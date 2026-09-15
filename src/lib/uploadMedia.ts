@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { uploadToR2 } from "./r2Upload";
 import { compressImage, generateTinyPlaceholder } from "./compressImage";
 import { compressVideo, extractThumbnail } from "./compressVideo";
 import { computeCropRect, composeCrop, FEED_ASPECTS } from "./cropMath";
@@ -108,23 +109,9 @@ async function processMedia(file: File, edit?: MediaEditorResult) {
   return { mediaFile: compressed.file, thumbnailBlob, width: compressed.width, height: compressed.height, mediaType };
 }
 
-async function uploadToBucket(bucket: string, userId: string, mediaFile: File, thumbnailBlob: Blob) {
-  const mediaPath = `${userId}/${crypto.randomUUID()}-${mediaFile.name}`;
-  const thumbPath = `${userId}/${crypto.randomUUID()}-thumb.jpg`;
-
-  const { error: mediaError } = await supabase.storage.from(bucket).upload(mediaPath, mediaFile, {
-    contentType: mediaFile.type,
-  });
-  if (mediaError) throw mediaError;
-
-  const { error: thumbError } = await supabase.storage.from(bucket).upload(thumbPath, thumbnailBlob, {
-    contentType: "image/jpeg",
-  });
-  if (thumbError) throw thumbError;
-
-  const mediaUrl = supabase.storage.from(bucket).getPublicUrl(mediaPath).data.publicUrl;
-  const thumbnailUrl = supabase.storage.from(bucket).getPublicUrl(thumbPath).data.publicUrl;
-
+async function uploadToBucket(folder: "posts" | "stories", mediaFile: File, thumbnailBlob: Blob) {
+  const mediaUrl = await uploadToR2(mediaFile, mediaFile.name, mediaFile.type, folder);
+  const thumbnailUrl = await uploadToR2(thumbnailBlob, "thumb.jpg", "image/jpeg", folder);
   return { mediaUrl, thumbnailUrl };
 }
 
@@ -157,7 +144,7 @@ export async function uploadPost({
   const { mediaFile, thumbnailBlob, width, height, mediaType } = await processMedia(file, edit);
 
   onProgress?.("uploading");
-  const { mediaUrl, thumbnailUrl } = await uploadToBucket("posts", user.id, mediaFile, thumbnailBlob);
+  const { mediaUrl, thumbnailUrl } = await uploadToBucket("posts", mediaFile, thumbnailBlob);
 
   onProgress?.("saving");
   const { data: post, error } = await supabase
@@ -196,7 +183,7 @@ export async function uploadStory({
   const { mediaFile, thumbnailBlob, mediaType } = await processMedia(file);
 
   onProgress?.("uploading");
-  const { mediaUrl, thumbnailUrl } = await uploadToBucket("stories", user.id, mediaFile, thumbnailBlob);
+  const { mediaUrl, thumbnailUrl } = await uploadToBucket("stories", mediaFile, thumbnailBlob);
 
   onProgress?.("saving");
   // expires_at defaults to now() + 24h at the database level — nothing to set here
@@ -255,17 +242,11 @@ export async function uploadCarouselPost({
 
   for (let i = 0; i < compressedItems.length; i++) {
     const { mediaFile, width, height } = compressedItems[i];
-    const path = `${user.id}/${crypto.randomUUID()}-${mediaFile.name}`;
-    const { error } = await supabase.storage.from("posts").upload(path, mediaFile, { contentType: mediaFile.type });
-    if (error) throw error;
-    const url = supabase.storage.from("posts").getPublicUrl(path).data.publicUrl;
+    const url = await uploadToR2(mediaFile, mediaFile.name, mediaFile.type, "posts");
     uploadedUrls.push({ url, width, height });
 
     if (i === 0) {
-      const thumbPath = `${user.id}/${crypto.randomUUID()}-thumb.jpg`;
-      const { error: thumbError } = await supabase.storage.from("posts").upload(thumbPath, firstThumbBlob, { contentType: "image/jpeg" });
-      if (thumbError) throw thumbError;
-      thumbnailUrl = supabase.storage.from("posts").getPublicUrl(thumbPath).data.publicUrl;
+      thumbnailUrl = await uploadToR2(firstThumbBlob, "thumb.jpg", "image/jpeg", "posts");
     }
   }
 

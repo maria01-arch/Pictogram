@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import type { Post } from "@/types/database";
-import TapToPlayVideo from "./TapToPlayVideo";
+import FeedVideo from "./FeedVideo";
 import PostActions from "./PostActions";
 import VerifiedBadge from "./VerifiedBadge";
 import HashtagText from "./HashtagText";
@@ -130,7 +130,7 @@ export default function PostCard({ post, onDeleted, fullCaption }: { post: Post;
             aspectRatio={post.width && post.height ? post.width / post.height : 4 / 5}
           />
         ) : post.media_type === "video" ? (
-          <TapToPlayVideo
+          <FeedVideo
             videoUrl={post.media_url!}
             thumbnailUrl={post.thumbnail_url}
             aspectRatio={videoAspect}
