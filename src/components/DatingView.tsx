@@ -70,6 +70,13 @@ export default function DatingView() {
   async function handleEnable() {
     setError(null);
     try {
+      // Re-confirm immediately before enabling rather than trusting the
+      // client's ageConfirmed state alone — if that state is ever stale
+      // (e.g. this component remounted with an old profile fetch, or a
+      // prior confirmDatingAge() call didn't actually persist), enableDating
+      // would otherwise hit the DB's age-confirmation check constraint every
+      // time. This call is cheap and idempotent either way.
+      await confirmDatingAge();
       await enableDating(bioDraft);
       setEnabled(true);
     } catch (err) {
