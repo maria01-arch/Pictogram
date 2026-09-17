@@ -24,7 +24,17 @@ export async function enableDating(bio: string) {
   if (!user) throw new Error("You must be signed in.");
   const { error } = await supabase
     .from("dating_profiles")
-    .upsert({ user_id: user.id, enabled: true, bio, updated_at: new Date().toISOString() });
+    .upsert({
+      user_id: user.id,
+      enabled: true,
+      bio,
+      // Set directly here rather than trusting a separate confirmDatingAge()
+      // call to have already persisted it — upsert doesn't reliably leave
+      // untouched columns alone, so a prior call setting this isn't enough
+      // on its own; it has to be in THIS payload too.
+      age_confirmed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
   if (error) throw error;
 }
 
