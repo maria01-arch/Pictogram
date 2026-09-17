@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { checkIsAdmin } from "../lib/admin";
+import { getStoredTheme, applyTheme, type ThemePreference } from "@/lib/theme";
 
 export default function SettingsView() {
   const [requiresApproval, setRequiresApproval] = useState(false);
@@ -11,6 +12,16 @@ export default function SettingsView() {
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [theme, setTheme] = useState<ThemePreference>("system");
+
+  useEffect(() => {
+    setTheme(getStoredTheme());
+  }, []);
+
+  function handleThemeChange(pref: ThemePreference) {
+    setTheme(pref);
+    applyTheme(pref);
+  }
 
   useEffect(() => {
     async function load() {
@@ -50,7 +61,24 @@ export default function SettingsView() {
     <div className="px-4 pb-8 pt-4">
       <h2 className="text-lg font-bold">Settings</h2>
 
-      <div className="mt-5 flex items-center justify-between rounded-xl2 glass-card px-4 py-3.5">
+      <div className="mt-5 rounded-xl2 glass-card px-4 py-3.5">
+        <p className="text-sm font-semibold">Appearance</p>
+        <div className="mt-3 flex gap-2 rounded-full bg-black/5 p-1 dark:bg-white/10">
+          {(["light", "dark", "system"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => handleThemeChange(t)}
+              className={`flex-1 rounded-full py-1.5 text-xs font-semibold capitalize transition ${
+                theme === t ? "bg-brand-gradient text-white" : "text-ink-muted"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-3 flex items-center justify-between rounded-xl2 glass-card px-4 py-3.5">
         <div>
           <p className="text-sm font-semibold">Approve new followers</p>
           <p className="mt-0.5 text-xs text-ink-muted">Review requests before someone can follow you</p>

@@ -5,6 +5,7 @@ import AppChrome from "@/components/AppChrome";
 import { TopLoadingProvider } from "@/components/TopLoadingBar";
 import OneSignalInit from "@/components/OneSignalInit";
 import RealtimeNotificationListener from "@/components/RealtimeNotificationListener";
+import ThemeInit from "@/components/ThemeInit";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -40,8 +41,24 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${spaceGrotesk.variable} ${inter.variable}`}>
+    <html lang="en" className={`${spaceGrotesk.variable} ${inter.variable}`} suppressHydrationWarning>
+      <head>
+        {/* Runs synchronously before anything paints, so the correct theme
+            is already applied on first frame — no flash of the wrong theme
+            while React hydrates. This is also the very first place .dark
+            ever gets added to <html> in this app; see src/lib/theme.ts. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try {
+  var pref = localStorage.getItem('pictogram_theme') || 'system';
+  var isDark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.classList.toggle('dark', isDark);
+} catch (e) {}`,
+          }}
+        />
+      </head>
       <body className="min-h-screen">
+        <ThemeInit />
         <OneSignalInit />
         <RealtimeNotificationListener />
         <TopLoadingProvider>
