@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { getUserLocal } from "@/lib/authUser";
 
 export interface WallpaperItem {
   id: string;
@@ -40,7 +41,7 @@ export async function getFavorites(): Promise<FavoriteRow[]> {
 export async function addFavorite(w: WallpaperItem) {
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getUserLocal();
   if (!user) throw new Error("You must be signed in.");
   const { error } = await supabase.from("gallery_favorites").insert({
     user_id: user.id,
@@ -55,7 +56,7 @@ export async function addFavorite(w: WallpaperItem) {
 export async function removeFavorite(wallhavenId: string) {
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getUserLocal();
   if (!user) return;
   const { error } = await supabase.from("gallery_favorites").delete().eq("user_id", user.id).eq("wallhaven_id", wallhavenId);
   if (error) throw error;
@@ -67,7 +68,7 @@ export async function removeFavorite(wallhavenId: string) {
 export async function sendWallpaperToChat(conversationId: string, imageUrl: string) {
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getUserLocal();
   if (!user) throw new Error("You must be signed in.");
   const { error } = await supabase.from("messages").insert({
     conversation_id: conversationId,

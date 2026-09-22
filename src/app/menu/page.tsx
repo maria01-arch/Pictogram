@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import AccountSwitcherSheet from "@/components/AccountSwitcherSheet";
 import { clearAccountStash } from "@/lib/accountSwitcher";
+import { getUserLocal } from "@/lib/authUser";
 
 interface MenuItem {
   href: string;
@@ -88,6 +89,12 @@ const SECTIONS: { title: string; items: MenuItem[] }[] = [
         description: "How we handle your data",
         icon: "M9 12h6m-6 4h6M9 8h6M5 4h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1z",
       },
+      {
+        href: "/terms",
+        label: "Terms & Guidelines",
+        description: "Community rules and terms of use",
+        icon: "M9 12h6m-6 4h6M9 8h6M5 4h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1z",
+      },
     ],
   },
 ];
@@ -98,7 +105,7 @@ export default function MenuPage() {
   const [switcherOpen, setSwitcherOpen] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
+    getUserLocal().then(async ({ data: { user } }) => {
       if (!user) return;
       const { data } = await supabase.from("profiles").select("username, avatar_url, display_name").eq("id", user.id).single();
       setProfile(data);

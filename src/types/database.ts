@@ -16,6 +16,9 @@ export interface Profile {
   is_verified: boolean;
   last_seen_at?: string | null;
   read_receipts_enabled?: boolean;
+  age?: number | null;
+  suspended_at?: string | null;
+  terms_accepted_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -37,6 +40,14 @@ export interface Post {
   cover_focal_y: number;
   profiles?: Pick<Profile, "username" | "avatar_url" | "is_verified">;
   post_media?: PostMedia[];
+}
+
+// Counts + "did I like/save it" delivered with the feed in a single call.
+export interface PostStats {
+  likeCount: number;
+  commentCount: number;
+  liked: boolean;
+  saved: boolean;
 }
 
 export interface PostMedia {

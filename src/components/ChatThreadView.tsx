@@ -24,8 +24,10 @@ import { ChatSkeleton } from "./Skeleton";
 import { isSingleEmoji } from "@/lib/emoji";
 import type { Message, MessageReaction, Profile } from "@/types/database";
 import type { RealtimeChannel } from "@supabase/supabase-js";
+import { getUserLocal } from "@/lib/authUser";
 
 const TYPING_TIMEOUT_MS = 2500;
+const PAGE_SIZE = 40; // messages loaded at a time (older ones load as you scroll up)
 const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 // Consecutive messages from the same sender within this window are visually
 // grouped together (tighter spacing, ticks/timestamp only on the last one).
@@ -107,6 +109,11 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
   const [myReadReceiptsEnabled, setMyReadReceiptsEnabled] = useState(true);
   const [, forceTick] = useState(0); // periodic re-render so the online dot ages out on its own
   const [messages, setMessages] = useState<Message[]>([]);
+  const [hasOlder, setHasOlder] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [extraQuoted, setExtraQuoted] = useState<Record<string, Message>>({});
+  const [sendError, setSendError] = useState<string | null>(null);
+  const restoreScrollRef = useRef<{ height: number; top: number } | null>(null);
   const [reactions, setReactions] = useState<MessageReaction[]>([]);
   const [draft, setDraft] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
@@ -139,6 +146,60 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     if (!el) return;
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     setShowJumpToBottom(distanceFromBottom > JUMP_THRESHOLD_PX);
+    if (el.scrollTop < 120 && hasOlder && !loadingOlder) loadOlder();
+  }
+
+  // Loads the next-older page of messages when you scroll to the top.
+  async function loadOlder() {
+    const oldest = messages.find((m) => !m.id.startsWith("optimistic-"));
+    if (!oldest || loadingOlder) return;
+    setLoadingOlder(true);
+    const el = scrollContainerRef.current;
+    const { data: rows } = await supabase
+      .from("messages")
+      .select("*")
+      .eq("conversation_id", conversationId)
+      .lt("created_at", oldest.created_at)
+      .order("created_at", { ascending: false })
+      .limit(PAGE_SIZE);
+    const older = (rows ?? []).reverse() as Message[];
+    if (older.length > 0) {
+      if (el) restoreScrollRef.current = { height: el.scrollHeight, top: el.scrollTop };
+      setMessages((prev) => {
+        const known = new Set(prev.map((m) => m.id));
+        return [...older.filter((m) => !known.has(m.id)), ...prev];
+      });
+      const { data: reacts } = await supabase
+        .from("message_reactions")
+        .select("*")
+        .in("message_id", older.map((m) => m.id));
+      if (reacts && reacts.length > 0) {
+        setReactions((prev) => {
+          const known = new Set(prev.map((r) => `${r.message_id}:${r.user_id}`));
+          return [...prev, ...reacts.filter((r: MessageReaction) => !known.has(`${r.message_id}:${r.user_id}`))];
+        });
+      }
+      loadMissingQuoted(older);
+    }
+    setHasOlder((rows ?? []).length === PAGE_SIZE);
+    setLoadingOlder(false);
+  }
+
+  // A reply may quote a message that isn't in the loaded page — fetch just those.
+  async function loadMissingQuoted(batch: Message[]) {
+    const have = new Set(batch.map((m) => m.id));
+    const missing = Array.from(
+      new Set(batch.map((m) => m.reply_to_id).filter((id): id is string => !!id && !have.has(id)))
+    );
+    if (missing.length === 0) return;
+    const { data } = await supabase.from("messages").select("*").in("id", missing);
+    if (data && data.length > 0) {
+      setExtraQuoted((prev) => {
+        const next = { ...prev };
+        for (const m of data as Message[]) next[m.id] = m;
+        return next;
+      });
+    }
   }
   function jumpToBottom() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -157,7 +218,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
 
   async function init() {
     start();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await getUserLocal();
     if (!user) {
       setInitialLoading(false);
       done();
@@ -175,7 +236,8 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
         .from("messages")
         .select("*")
         .eq("conversation_id", conversationId)
-        .order("created_at", { ascending: true }),
+        .order("created_at", { ascending: false })
+        .limit(PAGE_SIZE),
     ]);
 
     const other = (participants ?? []).find((p: any) => p.user_id !== user.id);
@@ -190,7 +252,11 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
       setMyReadReceiptsEnabled((mine as any).profiles?.read_receipts_enabled ?? true);
     }
 
-    setMessages(msgs ?? []);
+    // Fetched newest-first (so we only download the latest page) — show oldest-first.
+    const orderedMsgs = ((msgs ?? []) as Message[]).slice().reverse();
+    setMessages(orderedMsgs);
+    setHasOlder((msgs ?? []).length === PAGE_SIZE);
+    loadMissingQuoted(orderedMsgs);
 
     if (msgs && msgs.length > 0) {
       const { data: reacts } = await supabase
@@ -275,8 +341,19 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
   }
 
   const hasScrolledOnceRef = useRef(false);
+  const lastMessageId = messages.length > 0 ? messages[messages.length - 1].id : null;
+
+  // After older messages are prepended, keep the reader exactly where they were.
   useEffect(() => {
-    if (messages.length === 0) return;
+    const restore = restoreScrollRef.current;
+    const el = scrollContainerRef.current;
+    if (!restore || !el) return;
+    el.scrollTop = el.scrollHeight - restore.height + restore.top;
+    restoreScrollRef.current = null;
+  }, [messages.length]);
+
+  useEffect(() => {
+    if (!lastMessageId) return;
     // First load of a thread: jump straight to the bottom, no animation —
     // a smooth scroll here can land short if images/avatars are still
     // laying out, which is why reopening a chat needed a manual scroll.
@@ -287,7 +364,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     } else {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages.length]);
+  }, [lastMessageId]);
 
   useEffect(() => {
     async function poll() {
@@ -310,7 +387,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
       if (profile) setOtherProfile((prev) => (prev ? { ...prev, ...profile } : prev));
     }
 
-    const tick = setInterval(poll, 15_000);
+    const tick = setInterval(poll, 45_000);
     return () => clearInterval(tick);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, otherProfile?.id]);
@@ -365,6 +442,10 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
 
     if (error) {
       setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+      // Don't silently swallow the message: put the text back and say so.
+      setDraft(content);
+      setSendError("Message couldn't be sent. Check your connection and try again.");
+      setTimeout(() => setSendError(null), 5000);
       return;
     }
 
@@ -378,9 +459,6 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
           targetUserId: otherProfile.id,
           type: "message",
           conversationId,
-          pushTitle: "New message",
-          pushBody: content.length > 60 ? content.slice(0, 60) + "…" : content,
-          pushUrl: `/chat/${conversationId}`,
         });
       }
     }
@@ -601,7 +679,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
   }
   function quotedContent(replyToId: string | null) {
     if (!replyToId) return null;
-    const target = messages.find((m) => m.id === replyToId);
+    const target = messages.find((m) => m.id === replyToId) ?? extraQuoted[replyToId];
     return target ? previewLabel(target) : null;
   }
 
@@ -649,6 +727,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
       ) : (
       <div className="relative min-h-0 flex-1">
       <div ref={scrollContainerRef} onScroll={handleMessagesScroll} className="h-full overflow-y-auto px-3 py-2.5 no-scrollbar">
+        {loadingOlder && <p className="py-2 text-center text-xs text-ink-muted">Loading earlier messages…</p>}
         {messages.length === 0 && otherProfile && (
           <div className="flex flex-col items-center gap-2 py-16 text-center">
             <div className="h-20 w-20 overflow-hidden rounded-full bg-brand-gradient">
@@ -834,6 +913,9 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
           <p className="flex-1 text-xs text-ink-muted">Editing message</p>
           <button onClick={() => { setEditingMessage(null); setDraft(""); }} className="text-ink-muted">✕</button>
         </div>
+      )}
+      {sendError && (
+        <div className="border-t border-black/5 px-3 py-1.5 text-xs text-red-500 dark:border-white/5">{sendError}</div>
       )}
       {uploadingImage && (
         <div className="border-t border-black/5 px-3 py-1.5 text-xs text-ink-muted dark:border-white/5">Sending image…</div>

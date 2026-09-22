@@ -1,10 +1,12 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { compressImage } from "@/lib/compressImage";
 import { getErrorMessage } from "@/lib/errorMessage";
+import { getUserLocal } from "@/lib/authUser";
 
 type Step = "name" | "credentials" | "otp" | "profile";
 
@@ -23,6 +25,7 @@ export default function SignupWizard() {
   const [username, setUsername] = useState("");
 
   // Step 2
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -35,7 +38,7 @@ export default function SignupWizard() {
   const [location, setLocation] = useState("");
   const [age, setAge] = useState("");
 
-  function handleNameNext(e: React.FormEvent) {
+  async function handleNameNext(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     const trimmedUsername = username.trim();
@@ -47,19 +50,35 @@ export default function SignupWizard() {
       setError("Username must be 3-20 characters: letters, numbers, periods, or underscores only.");
       return;
     }
+
+    // Tell them NOW if it's taken (the database's own error at signup is unhelpful).
+    // If the check itself can't run, carry on — the database still enforces uniqueness.
+    setBusy(true);
+    const { data: available, error: checkError } = await supabase.rpc("username_available", {
+      candidate: trimmedUsername,
+    });
+    setBusy(false);
+    if (!checkError && available === false) {
+      setError("That username is already taken. Try another one.");
+      return;
+    }
     setStep("credentials");
   }
 
   async function handleCredentialsNext(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!termsAccepted) {
+      setError("Please accept the Terms and Privacy Policy to continue.");
+      return;
+    }
     setBusy(true);
     try {
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { username: username.trim(), display_name: fullName.trim() },
+          data: { username: username.trim(), display_name: fullName.trim(), terms_accepted: true },
         },
       });
       if (error) throw error;
@@ -117,7 +136,7 @@ export default function SignupWizard() {
     setError(null);
     setBusy(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await getUserLocal();
       if (!user) throw new Error("Your session expired — please sign up again.");
 
       let avatarUrl: string | null = null;
@@ -199,8 +218,12 @@ export default function SignupWizard() {
             className="w-full rounded-xl2 bg-black/5 p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-from dark:bg-white/10"
           />
           {error && <p className="text-sm text-red-500">{error}</p>}
-          <button type="submit" className="w-full rounded-full bg-brand-gradient py-3 text-sm font-semibold text-white">
-            Next
+          <button
+            type="submit"
+            disabled={busy}
+            className="w-full rounded-full bg-brand-gradient py-3 text-sm font-semibold text-white disabled:opacity-40"
+          >
+            {busy ? "Checking…" : "Next"}
           </button>
         </form>
       )}
@@ -224,10 +247,29 @@ export default function SignupWizard() {
             minLength={6}
             className="w-full rounded-xl2 bg-black/5 p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-from dark:bg-white/10"
           />
+          <label className="flex items-start gap-2.5 text-xs text-ink-muted">
+            <input
+              type="checkbox"
+              checked={termsAccepted}
+              onChange={(e) => setTermsAccepted(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0"
+            />
+            <span>
+              I agree to the{" "}
+              <Link href="/terms" target="_blank" className="font-semibold text-brand-from">
+                Terms &amp; Community Guidelines
+              </Link>{" "}
+              and the{" "}
+              <Link href="/privacy-policy" target="_blank" className="font-semibold text-brand-from">
+                Privacy Policy
+              </Link>
+              . I understand there is no tolerance for objectionable content or abuse.
+            </span>
+          </label>
           {error && <p className="text-sm text-red-500">{error}</p>}
           <button
             type="submit"
-            disabled={busy}
+            disabled={busy || !termsAccepted}
             className="w-full rounded-full bg-brand-gradient py-3 text-sm font-semibold text-white disabled:opacity-40"
           >
             {busy ? "Please wait…" : "Next"}

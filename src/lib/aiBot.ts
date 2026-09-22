@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { getUserLocal } from "@/lib/authUser";
 
 export const AI_BOT_USERNAME = "ai_assistant";
 
@@ -10,10 +11,23 @@ async function getBotId(): Promise<string | null> {
 }
 
 // Finds (or creates) the user's 1:1 conversation with the AI assistant.
-export async function ensureAiConversation(): Promise<string | null> {
+let aiConversationPromise: Promise<string | null> | null = null;
+
+// Memoized: the chat list used to run 3+ queries for this on every visit.
+export function ensureAiConversation(): Promise<string | null> {
+  if (!aiConversationPromise) {
+    aiConversationPromise = ensureAiConversationUncached().then((id) => {
+      if (!id) aiConversationPromise = null; // failed — allow a retry next time
+      return id;
+    });
+  }
+  return aiConversationPromise;
+}
+
+async function ensureAiConversationUncached(): Promise<string | null> {
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getUserLocal();
   if (!user) return null;
 
   const botId = await getBotId();

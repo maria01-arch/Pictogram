@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { getMyLatestApplication, submitVerificationApplication } from "@/lib/verification";
 import { CRYPTO_ADDRESSES, isCryptoConfigured } from "@/lib/cryptoAddresses";
 import { getErrorMessage } from "@/lib/errorMessage";
+import { isNativeApp } from "@/lib/platform";
 import type { CryptoCurrency, PaymentMethod, VerificationApplication } from "@/types/database";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -19,6 +20,10 @@ export default function VerificationForm() {
   const txInputRef = useRef<HTMLInputElement>(null);
 
   const [existing, setExisting] = useState<VerificationApplication | null | "loading">("loading");
+  // Google Play only allows paid digital features through Play Billing, so the
+  // (crypto) application is hidden inside the installed app. See lib/platform.ts.
+  const [inApp, setInApp] = useState(false);
+  useEffect(() => setInApp(isNativeApp()), []);
 
   const [fullName, setFullName] = useState("");
   const [statement, setStatement] = useState("");
@@ -106,6 +111,15 @@ export default function VerificationForm() {
       <div className="px-4 py-16 text-center">
         <h2 className="text-lg font-bold">Get verified</h2>
         <p className="mt-3 text-sm text-ink-muted">{STATUS_LABEL[existing.status]}</p>
+      </div>
+    );
+  }
+
+  if (inApp) {
+    return (
+      <div className="px-4 py-16 text-center">
+        <h2 className="text-lg font-bold">Get verified</h2>
+        <p className="mt-3 text-sm text-ink-muted">Verification isn't available in the app right now.</p>
       </div>
     );
   }

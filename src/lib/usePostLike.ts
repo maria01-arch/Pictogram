@@ -3,23 +3,34 @@
 import { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
 import { createNotification } from "./notifications";
+import { getUserLocal } from "@/lib/authUser";
 
 // Single source of truth for a post's like state, shared between the
 // action pill's heart button and the double-tap gesture on the media
 // itself — both need to read/update the exact same state, not two
 // independently-fetched copies that could drift out of sync.
-export function usePostLike(postId: string, postOwnerId?: string) {
-  const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(0);
+export function usePostLike(
+  postId: string,
+  postOwnerId?: string,
+  // When the feed already fetched these, we skip the per-post queries entirely.
+  initial?: { liked: boolean; likeCount: number }
+) {
+  const [liked, setLiked] = useState(initial?.liked ?? false);
+  const [likeCount, setLikeCount] = useState(initial?.likeCount ?? 0);
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    load();
+    if (initial) {
+      getUserLocal().then(({ data }) => setUserId(data.user?.id ?? null));
+    } else {
+      load();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postId]);
 
   async function load() {
     const [{ data: { user } }, countRes] = await Promise.all([
-      supabase.auth.getUser(),
+      getUserLocal(),
       supabase.from("likes").select("*", { count: "exact", head: true }).eq("post_id", postId),
     ]);
     setUserId(user?.id ?? null);
@@ -41,14 +52,7 @@ export function usePostLike(postId: string, postOwnerId?: string) {
     setLikeCount((c) => c + 1);
     await supabase.from("likes").insert({ post_id: postId, user_id: userId });
     if (postOwnerId) {
-      const { data: me } = await supabase.from("profiles").select("username").eq("id", userId).single();
-      createNotification({
-        targetUserId: postOwnerId,
-        type: "like",
-        postId,
-        pushTitle: "New like",
-        pushBody: `${me?.username ?? "Someone"} liked your post`,
-      });
+      createNotification({ targetUserId: postOwnerId, type: "like", postId });
     }
   }
 

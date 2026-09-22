@@ -1,4 +1,4 @@
-const ONLINE_THRESHOLD_MS = 60_000;
+const ONLINE_THRESHOLD_MS = 100_000;
 
 export function isOnline(lastSeenAt: string | null | undefined): boolean {
   if (!lastSeenAt) return false;

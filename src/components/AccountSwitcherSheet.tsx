@@ -12,6 +12,7 @@ import {
   syncCurrentAccountIntoStash,
   type StashedAccount,
 } from "@/lib/accountSwitcher";
+import { getUserLocal } from "@/lib/authUser";
 
 export default function AccountSwitcherSheet({ onClose }: { onClose: () => void }) {
   useScrollLock();
@@ -28,7 +29,7 @@ export default function AccountSwitcherSheet({ onClose }: { onClose: () => void 
       setAccounts(getStashedAccounts());
       const {
         data: { user },
-      } = await supabase.auth.getUser();
+      } = await getUserLocal();
       setCurrentId(user?.id ?? null);
     })();
   }, []);

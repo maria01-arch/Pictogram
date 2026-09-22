@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import type { Story } from "@/types/database";
 import Portal from "./Portal";
 import { useScrollLock } from "@/lib/useScrollLock";
+import { getUserLocal } from "@/lib/authUser";
+import { submitReport } from "@/lib/reports";
+import ReportSheet from "./ReportSheet";
 
 // How long a press has to be held before it counts as "hold to pause"
 // instead of a tap-to-navigate. Below this, releasing navigates; at or
@@ -26,7 +29,13 @@ export default function StoryViewer({
   const [index, setIndex] = useState(0);
   const [holding, setHolding] = useState(false);
   const [progress, setProgress] = useState(0); // 0-1 fill for the current segment
+  const [viewerId, setViewerId] = useState<string | null>(null);
+  const [reporting, setReporting] = useState(false);
   const current = stories[index];
+
+  useEffect(() => {
+    getUserLocal().then(({ data }) => setViewerId(data.user?.id ?? null));
+  }, []);
   useScrollLock();
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -125,6 +134,28 @@ export default function StoryViewer({
     }
   }
 
+  function openReport() {
+    pause(); // freeze the story while the sheet is open
+    setReporting(true);
+  }
+
+  function closeReport() {
+    setReporting(false);
+    resume();
+  }
+
+  async function handleReport(category: string, details: string) {
+    await submitReport({
+      targetType: "story",
+      reportedUserId: current.user_id,
+      storyId: current.id,
+      category,
+      details,
+      evidence: current.text_content ?? null,
+      evidenceUrl: current.thumbnail_url ?? current.media_url ?? null,
+    });
+  }
+
   function handlePointerCancel() {
     if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
     if (wasHoldRef.current) resume();
@@ -157,9 +188,29 @@ export default function StoryViewer({
         {holding && <p className="text-xs text-white/70">Paused</p>}
       </div>
 
-      <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="absolute right-3 top-5 z-10 text-white">
+      {/* Buttons stop pointer events so the tap doesn't also count as
+          "next/previous story" on the container underneath. */}
+      <button
+        onPointerDown={(e) => e.stopPropagation()}
+        onPointerUp={(e) => e.stopPropagation()}
+        onClick={(e) => { e.stopPropagation(); onClose(); }}
+        className="absolute right-3 top-5 z-10 text-white"
+        aria-label="Close"
+      >
         ✕
       </button>
+      {viewerId && current.user_id !== viewerId && (
+        <button
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); openReport(); }}
+          className="absolute right-12 top-5 z-10 text-xs font-semibold text-white/90"
+          aria-label="Report story"
+        >
+          Report
+        </button>
+      )}
+      {reporting && <ReportSheet title="Report story" onSubmit={handleReport} onClose={closeReport} />}
 
       {current.media_type === "text" ? (
         <div className="flex h-full w-full items-center justify-center bg-brand-gradient px-8">

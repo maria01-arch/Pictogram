@@ -1,12 +1,13 @@
 import { supabase } from "./supabaseClient";
 import { compressImage } from "./compressImage";
+import { getUserLocal } from "@/lib/authUser";
 
 // chat-media is a PRIVATE bucket (see fix_chat_media_private.sql) — we store
 // the bare storage path in messages.media_url and resolve it to a short-lived
 // signed URL at render time (see resolveChatMediaUrl below), instead of a
 // public URL that anyone with the link could open.
 export async function uploadChatImage(file: File): Promise<string> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getUserLocal();
   if (!user) throw new Error("You must be signed in.");
 
   const { file: compressed } = await compressImage(file, { maxWidth: 1080 });

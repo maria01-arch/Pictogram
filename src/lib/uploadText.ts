@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { getUserLocal } from "@/lib/authUser";
 
 export const MIN_TEXT_POST_WORDS = 20;
 
@@ -7,7 +8,7 @@ export function wordCount(text: string): number {
 }
 
 export async function uploadTextPost(text: string) {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getUserLocal();
   if (!user) throw new Error("You must be signed in to post.");
 
   if (wordCount(text) < MIN_TEXT_POST_WORDS) {
@@ -26,7 +27,7 @@ export async function uploadTextPost(text: string) {
 }
 
 export async function uploadTextStory(text: string) {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getUserLocal();
   if (!user) throw new Error("You must be signed in to post a story.");
   if (!text.trim()) throw new Error("Story text can't be empty.");
 

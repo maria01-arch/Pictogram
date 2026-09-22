@@ -11,6 +11,7 @@ import { hideConversation, reportConversation } from "@/lib/conversationActions"
 import { ensureAiConversation, AI_BOT_USERNAME } from "@/lib/aiBot";
 import { blockUser } from "@/lib/block";
 import ConversationActionSheet from "./ConversationActionSheet";
+import { getUserLocal } from "@/lib/authUser";
 
 interface ConversationSummary {
   id: string;
@@ -51,72 +52,38 @@ export default function ConversationList() {
     return () => clearInterval(tick);
   }, []);
 
-  async function buildSummary(row: any, user: { id: string }): Promise<ConversationSummary | null> {
-    const convo = row.conversations;
-    if (!convo) return null;
-
-    const [{ data: others }] = await Promise.all([
-      supabase
-        .from("conversation_participants")
-        .select("user_id, profiles!conversation_participants_user_id_fkey(username, avatar_url, last_seen_at)")
-        .eq("conversation_id", convo.id)
-        .neq("user_id", user.id)
-        .limit(1),
-    ]);
-    const otherRow = others?.[0] as any;
-    const other = otherRow?.profiles;
-
-    const messages = (convo.messages ?? []).sort(
-      (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
-    const lastMessage = messages[0];
-
-    let latestReaction: any = null;
-    if (messages.length > 0) {
-      const { data: reactionRows } = await supabase
-        .from("message_reactions")
-        .select("emoji, created_at, user_id, message_id, profiles!message_reactions_user_id_fkey(username)")
-        .in("message_id", messages.map((m: any) => m.id))
-        .order("created_at", { ascending: false })
-        .limit(1);
-      latestReaction = reactionRows?.[0] ?? null;
-    }
-
+  // One database call (my_conversations) returns every chat with its last message,
+  // latest reaction and hidden/sorted state — it used to download every message
+  // of every conversation and then run extra queries per chat.
+  function toSummary(row: any): ConversationSummary {
     let preview = "Say hello 👋";
-    let activityAt: string | null = lastMessage?.created_at ?? null;
+    let activityAt: string | null = row.last_message_at ?? null;
 
-    if (lastMessage) {
+    if (row.last_message_at) {
       preview =
-        lastMessage.content ??
-        (lastMessage.media_url
-          ? isVoiceNotePath(lastMessage.media_url)
+        row.last_content ??
+        (row.last_media_url
+          ? isVoiceNotePath(row.last_media_url)
             ? "🎤 Voice message"
             : "📷 Sent a photo"
           : "Say hello 👋");
     }
 
-    if (latestReaction && (!lastMessage || new Date(latestReaction.created_at) > new Date(lastMessage.created_at))) {
-      const reactedToOwnMessage = messages.find((m: any) => m.id === latestReaction.message_id)?.sender_id === user.id;
-      preview = reactedToOwnMessage
-        ? `${latestReaction.profiles?.username ?? "Someone"} reacted ${latestReaction.emoji} to your message`
-        : `You reacted ${latestReaction.emoji}`;
-      activityAt = latestReaction.created_at;
-    }
-
-    // Soft-deleted by this user, and nothing has happened since — stays
-    // hidden. Any newer activity brings it back, same as WhatsApp.
-    if (row.hidden_at && (!activityAt || new Date(activityAt) <= new Date(row.hidden_at))) {
-      return null;
+    if (row.reaction_emoji && (!row.last_message_at || new Date(row.reaction_at) > new Date(row.last_message_at))) {
+      preview = row.reaction_on_mine
+        ? `${row.reaction_username ?? "Someone"} reacted ${row.reaction_emoji} to your message`
+        : `You reacted ${row.reaction_emoji}`;
+      activityAt = row.reaction_at;
     }
 
     return {
-      id: convo.id,
-      title: convo.title,
-      is_group: convo.is_group,
-      other_id: otherRow?.user_id ?? null,
-      other_username: other?.username ?? null,
-      other_avatar: other?.avatar_url ?? null,
-      other_last_seen_at: other?.last_seen_at ?? null,
+      id: row.conversation_id,
+      title: row.title,
+      is_group: row.is_group,
+      other_id: row.other_id ?? null,
+      other_username: row.other_username ?? null,
+      other_avatar: row.other_avatar ?? null,
+      other_last_seen_at: row.other_last_seen_at ?? null,
       preview,
       activityAt,
       hiddenAt: row.hidden_at ?? null,
@@ -126,43 +93,18 @@ export default function ConversationList() {
   async function load() {
     start();
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await getUserLocal();
       if (!user) return;
 
       await ensureAiConversation();
 
-      const { data, error } = await supabase
-        .from("conversation_participants")
-        .select(
-          `
-          conversation_id,
-          hidden_at,
-          conversations (
-            id, title, is_group,
-            messages ( id, content, media_url, created_at, sender_id )
-          )
-        `
-        )
-        .eq("user_id", user.id);
-
+      const { data, error } = await supabase.rpc("my_conversations");
       if (error) {
         console.error("Failed to load conversations:", error.message);
         return;
       }
 
-      // Build every conversation's summary concurrently instead of one at a
-      // time — this was the slowest part of loading the chat list.
-      const summaries = (
-        await Promise.all((data ?? []).map((row: any) => buildSummary(row, user)))
-      ).filter((s): s is ConversationSummary => s !== null);
-
-      summaries.sort((a, b) => {
-        if (!a.activityAt && !b.activityAt) return 0;
-        if (!a.activityAt) return 1;
-        if (!b.activityAt) return -1;
-        return new Date(b.activityAt).getTime() - new Date(a.activityAt).getTime();
-      });
-
+      const summaries = (data ?? []).map((row: any) => toSummary(row));
       cachedConversations = summaries;
       setConversations(summaries);
     } finally {

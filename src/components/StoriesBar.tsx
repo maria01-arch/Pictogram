@@ -5,6 +5,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import StoryViewer from "./StoryViewer";
 import type { Story } from "@/types/database";
+import { getBlockedUserIds } from "@/lib/block";
 
 interface UserStories {
   username: string;
@@ -21,12 +22,14 @@ export default function StoriesBar() {
       const { data } = await supabase
         .from("stories")
         .select("*, profiles!stories_user_id_fkey(username, avatar_url)")
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: true })
+        .limit(300);
 
+      const blocked = await getBlockedUserIds();
       const byUser = new Map<string, UserStories>();
       (data ?? []).forEach((story: any) => {
         const key = story.profiles?.username;
-        if (!key) return;
+        if (!key || blocked.has(story.user_id)) return;
         if (!byUser.has(key)) {
           byUser.set(key, { username: key, avatar_url: story.profiles.avatar_url, stories: [] });
         }

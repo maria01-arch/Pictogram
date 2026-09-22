@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabaseClient";
 import type { Post, Profile } from "@/types/database";
 import VerifiedBadge from "./VerifiedBadge";
 import { useTopLoading } from "./TopLoadingBar";
+import { getBlockedUserIds } from "@/lib/block";
 
 function SearchViewInner() {
   const { start, done } = useTopLoading();
@@ -30,7 +31,16 @@ function SearchViewInner() {
   async function runSearch() {
     setLoading(true);
     start();
-    const term = query.trim();
+    // Commas, parentheses, quotes and backslashes have special meaning inside
+    // the filter string and would break (or alter) the query — drop them.
+    const term = query.replace(/[,()"\\]/g, " ").trim();
+    if (!term) {
+      setProfiles([]);
+      setPosts([]);
+      setLoading(false);
+      done();
+      return;
+    }
 
     const [{ data: profileResults }, { data: postResults }] = await Promise.all([
       supabase.from("profiles").select("*").ilike("username", `%${term}%`).limit(20),
@@ -43,8 +53,9 @@ function SearchViewInner() {
         .limit(20),
     ]);
 
-    setProfiles(profileResults ?? []);
-    setPosts(postResults ?? []);
+    const blocked = await getBlockedUserIds();
+    setProfiles((profileResults ?? []).filter((p) => !blocked.has(p.id)));
+    setPosts((postResults ?? []).filter((p) => !blocked.has(p.user_id)));
     setLoading(false);
     done();
   }

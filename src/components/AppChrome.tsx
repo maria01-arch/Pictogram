@@ -7,6 +7,7 @@ import AuthHeaderControl from "./AuthHeaderControl";
 import { useBadgeCounts } from "@/lib/useBadgeCounts";
 import { usePresenceHeartbeat } from "@/lib/usePresenceHeartbeat";
 import { supabase } from "@/lib/supabaseClient";
+import { getUserLocal } from "@/lib/authUser";
 
 const NAV_ITEMS = [
   { href: "/", label: "Home", icon: "M3 11l9-8 9 8M5 10v10h14V10" },
@@ -85,7 +86,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
     (async () => {
       const {
         data: { user },
-      } = await supabase.auth.getUser();
+      } = await getUserLocal();
       if (!user) return;
       const { data } = await supabase.from("profiles").select("username, avatar_url").eq("id", user.id).single();
       if (data) setOwnProfile(data);

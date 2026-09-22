@@ -5,6 +5,7 @@ import { compressVideo, extractThumbnail } from "./compressVideo";
 import { computeCropRect, composeCrop, FEED_ASPECTS } from "./cropMath";
 import type { MediaEditorResult } from "../components/PostMediaEditor";
 import type { MediaType } from "@/types/database";
+import { getUserLocal } from "@/lib/authUser";
 
 export type UploadStage = "compressing" | "uploading" | "saving" | "done";
 
@@ -137,7 +138,7 @@ export async function uploadPost({
   edit?: MediaEditorResult;
   onProgress?: (stage: UploadStage) => void;
 }) {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getUserLocal();
   if (!user) throw new Error("You must be signed in to post.");
 
   onProgress?.("compressing");
@@ -176,7 +177,7 @@ export async function uploadStory({
   file: File;
   onProgress?: (stage: UploadStage) => void;
 }) {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getUserLocal();
   if (!user) throw new Error("You must be signed in to post a story.");
 
   onProgress?.("compressing");
@@ -213,7 +214,7 @@ export async function uploadCarouselPost({
   caption: string;
   onProgress?: (stage: UploadStage) => void;
 }) {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getUserLocal();
   if (!user) throw new Error("You must be signed in to post.");
   if (files.length < 2) throw new Error("A carousel needs at least 2 images.");
   if (files.some((f) => !f.type.startsWith("image/"))) {

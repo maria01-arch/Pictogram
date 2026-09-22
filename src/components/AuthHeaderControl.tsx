@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
+import { getUserLocal } from "@/lib/authUser";
 
 export default function AuthHeaderControl() {
   const [signedIn, setSignedIn] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setSignedIn(!!data.user));
+    getUserLocal().then(({ data }) => setSignedIn(!!data.user));
   }, []);
 
   if (!signedIn) return null;

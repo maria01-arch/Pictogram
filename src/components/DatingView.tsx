@@ -10,12 +10,19 @@ import {
   fetchCandidates,
   likeUser,
   fetchMatches,
+  getMyAge,
+  saveMyAge,
   type DatingCandidate,
   type DatingMatchSummary,
 } from "../lib/dating";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { getOrCreateDirectConversation } from "@/lib/conversations";
 import VerifiedBadge from "./VerifiedBadge";
+import type { Profile } from "@/types/database";
+import { getUserLocal } from "@/lib/authUser";
+import ReportSheet from "./ReportSheet";
+import { submitReport } from "@/lib/reports";
+import { blockUser } from "@/lib/block";
 
 type Tab = "search" | "matches";
 type SearchState = "idle" | "searching" | "results";
@@ -29,6 +36,10 @@ export default function DatingView() {
   const [enabled, setEnabled] = useState(false);
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [ageCheckbox, setAgeCheckbox] = useState(false);
+  const [myAge, setMyAge] = useState<number | null>(null);
+  const [ageInput, setAgeInput] = useState("");
+  const [reportTarget, setReportTarget] = useState<Profile | null>(null);
+  const [reportBio, setReportBio] = useState<string | null>(null);
   const [bioDraft, setBioDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -41,10 +52,11 @@ export default function DatingView() {
   const presenceChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
-    getMyDatingProfile().then((profile) => {
+    Promise.all([getMyDatingProfile(), getMyAge()]).then(([profile, age]) => {
       setEnabled(!!profile?.enabled);
       setAgeConfirmed(!!profile?.age_confirmed_at);
       setBioDraft(profile?.bio ?? "");
+      setMyAge(age);
       setLoading(false);
     });
 
@@ -60,6 +72,17 @@ export default function DatingView() {
   async function handleConfirmAge() {
     setError(null);
     try {
+      // The database needs a real age (18+) on the profile. It can only be set once.
+      if (myAge === null) {
+        const age = parseInt(ageInput, 10);
+        if (!Number.isFinite(age) || age < 13 || age > 120) {
+          setError("Please enter your real age.");
+          return;
+        }
+        await saveMyAge(age);
+        setMyAge(age);
+        if (age < 18) return; // the "18+ only" screen takes over
+      }
       await confirmDatingAge();
       setAgeConfirmed(true);
     } catch (err) {
@@ -89,7 +112,7 @@ export default function DatingView() {
     setSearchState("searching");
     setCandidateIndex(0);
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await getUserLocal();
     if (!user) return;
 
     const channel = supabase.channel("presence:dating", { config: { presence: { key: user.id } } });
@@ -144,6 +167,28 @@ export default function DatingView() {
     setCandidateIndex((i) => i + 1);
   }
 
+  async function handleReportProfile(category: string, details: string) {
+    if (!reportTarget) return;
+    await submitReport({
+      targetType: "user",
+      reportedUserId: reportTarget.id,
+      category,
+      details,
+      evidence: reportBio,
+      evidenceUrl: reportTarget.avatar_url ?? null,
+    });
+  }
+
+  async function handleBlockProfile(profile: Profile) {
+    try {
+      await blockUser(profile.id);
+      setCandidates((prev) => prev.filter((c) => c.profile.id !== profile.id));
+      setMatches((prev) => prev.filter((m) => m.profile.id !== profile.id));
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  }
+
   async function handleMessageMatch(userId: string) {
     try {
       const conversationId = await getOrCreateDirectConversation(userId);
@@ -155,13 +200,41 @@ export default function DatingView() {
 
   if (loading) return <p className="px-4 py-16 text-center text-sm text-ink-muted">Loading…</p>;
 
-  if (!ageConfirmed) {
+  if (myAge !== null && myAge < 18) {
+    return (
+      <div className="px-4 pb-8 pt-10 text-center">
+        <h2 className="text-lg font-bold">Dating is 18+</h2>
+        <p className="mt-2 text-sm text-ink-muted">
+          Dating is only available to people who are 18 or older.
+        </p>
+      </div>
+    );
+  }
+
+  if (!ageConfirmed || myAge === null) {
     return (
       <div className="px-4 pb-8 pt-6">
         <h2 className="text-lg font-bold">Dating is 18+</h2>
         <p className="mt-1 text-sm text-ink-muted">
           Dating is a separate, opt-in part of the app. Before you continue, please confirm the following.
         </p>
+
+        {myAge === null && (
+          <div className="mt-5">
+            <label className="text-sm font-medium">Your age</label>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={13}
+              max={120}
+              value={ageInput}
+              onChange={(e) => setAgeInput(e.target.value)}
+              placeholder="e.g. 24"
+              className="mt-1.5 w-full rounded-xl2 bg-black/5 px-3.5 py-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-from dark:bg-white/10"
+            />
+            <p className="mt-1 text-xs text-ink-muted">You can only set this once, so please be accurate.</p>
+          </div>
+        )}
 
         <label className="mt-6 flex items-start gap-3 rounded-xl2 bg-black/5 p-3 text-sm dark:bg-white/10">
           <input
@@ -177,7 +250,7 @@ export default function DatingView() {
 
         <button
           onClick={handleConfirmAge}
-          disabled={!ageCheckbox}
+          disabled={!ageCheckbox || (myAge === null && !ageInput)}
           className="mt-4 w-full rounded-full bg-brand-gradient py-3 text-sm font-semibold text-white disabled:opacity-40"
         >
           Continue
@@ -288,6 +361,14 @@ export default function DatingView() {
                     </p>
                     {currentCandidate.bio && <p className="mt-1 whitespace-pre-wrap text-sm text-ink-muted">{currentCandidate.bio}</p>}
                   </div>
+                  <div className="flex justify-center gap-5 pb-3 text-xs text-ink-muted">
+                    <button
+                      onClick={() => { setReportTarget(currentCandidate.profile); setReportBio(currentCandidate.bio); }}
+                    >
+                      Report
+                    </button>
+                    <button onClick={() => handleBlockProfile(currentCandidate.profile)}>Block</button>
+                  </div>
                   <div className="flex border-t border-black/5 dark:border-white/5">
                     <button onClick={handlePass} className="flex-1 py-3 text-sm font-semibold text-ink-muted">
                       Pass
@@ -315,6 +396,15 @@ export default function DatingView() {
                 </div>
                 <p className="flex-1 text-sm font-semibold">{m.profile.username}</p>
                 <button
+                  onClick={() => { setReportTarget(m.profile); setReportBio(null); }}
+                  className="text-xs text-ink-muted"
+                >
+                  Report
+                </button>
+                <button onClick={() => handleBlockProfile(m.profile)} className="text-xs text-ink-muted">
+                  Block
+                </button>
+                <button
                   onClick={() => handleMessageMatch(m.profile.id)}
                   className="rounded-full bg-brand-gradient px-3 py-1.5 text-xs font-semibold text-white"
                 >
@@ -324,6 +414,14 @@ export default function DatingView() {
             ))
           )}
         </div>
+      )}
+
+      {reportTarget && (
+        <ReportSheet
+          title={`Report @${reportTarget.username}`}
+          onSubmit={handleReportProfile}
+          onClose={() => setReportTarget(null)}
+        />
       )}
 
       {matchedProfile && (

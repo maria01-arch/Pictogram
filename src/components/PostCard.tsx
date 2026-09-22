@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import type { Post } from "@/types/database";
+import type { Post, PostStats } from "@/types/database";
 import FeedVideo from "./FeedVideo";
 import PostActions from "./PostActions";
 import VerifiedBadge from "./VerifiedBadge";
@@ -14,6 +14,10 @@ import ReadMoreText from "./ReadMoreText";
 import ConfirmModal from "./ConfirmModal";
 import PostMediaLightbox from "./PostMediaLightbox";
 import { usePostLike } from "@/lib/usePostLike";
+import { getUserLocal } from "@/lib/authUser";
+import ReportSheet from "./ReportSheet";
+import { submitReport } from "@/lib/reports";
+import { blockUser } from "@/lib/block";
 
 const CAPTION_LIMIT = 80;
 
@@ -29,15 +33,27 @@ function timeAgo(dateString: string): string {
   return "now";
 }
 
-export default function PostCard({ post, onDeleted, fullCaption }: { post: Post; onDeleted?: (id: string) => void; fullCaption?: boolean }) {
+export default function PostCard({
+  post,
+  onDeleted,
+  fullCaption,
+  stats,
+}: {
+  post: Post;
+  onDeleted?: (id: string) => void;
+  fullCaption?: boolean;
+  stats?: PostStats;
+}) {
   const router = useRouter();
   const username = post.profiles?.username;
   const [userId, setUserId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [reporting, setReporting] = useState(false);
+  const [confirmingBlock, setConfirmingBlock] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
+    getUserLocal().then(({ data }) => setUserId(data.user?.id ?? null));
   }, []);
 
   const isOwner = userId === post.user_id;
@@ -60,7 +76,11 @@ export default function PostCard({ post, onDeleted, fullCaption }: { post: Post;
   const longPressFiredRef = useRef(false);
   const lastTapRef = useRef(0);
   const [heartPop, setHeartPop] = useState(false);
-  const { liked, likeCount, like, toggleLike } = usePostLike(post.id, post.user_id);
+  const { liked, likeCount, like, toggleLike } = usePostLike(
+    post.id,
+    post.user_id,
+    stats ? { liked: stats.liked, likeCount: stats.likeCount } : undefined
+  );
 
   function startLongPress() {
     longPressFiredRef.current = false;
@@ -100,7 +120,31 @@ export default function PostCard({ post, onDeleted, fullCaption }: { post: Post;
       alert("Failed to delete post: " + error.message);
       return;
     }
+    // Database triggers queued this post's files; ask the server to remove
+    // them from storage right away (fire-and-forget).
+    fetch("/api/media/drain", { method: "POST" }).catch(() => {});
     onDeleted?.(post.id);
+  }
+
+  async function handleReport(category: string, details: string) {
+    await submitReport({
+      targetType: "post",
+      reportedUserId: post.user_id,
+      postId: post.id,
+      category,
+      details,
+      evidence: (post.media_type === "text" ? post.text_content : post.caption) ?? null,
+      evidenceUrl: post.thumbnail_url ?? post.media_url ?? null,
+    });
+  }
+
+  async function handleBlock() {
+    try {
+      await blockUser(post.user_id);
+      onDeleted?.(post.id); // remove it from this list right away
+    } catch (err) {
+      alert("Couldn't block this user. Please try again.");
+    }
   }
 
   return (
@@ -166,7 +210,7 @@ export default function PostCard({ post, onDeleted, fullCaption }: { post: Post;
             <span className="shrink-0 text-[11px] text-white/70">· {timeAgo(post.created_at)}</span>
           </Link>
 
-          {isOwner && (
+          {userId && (
             <div className="pointer-events-auto relative shrink-0">
               <button
                 onClick={() => setMenuOpen((o) => !o)}
@@ -178,14 +222,31 @@ export default function PostCard({ post, onDeleted, fullCaption }: { post: Post;
                 </svg>
               </button>
               {menuOpen && (
-                <div className="absolute right-0 top-9 z-10 w-32 overflow-hidden rounded-xl2 glass-card shadow-lg">
-                  <button
-                    onClick={() => { setMenuOpen(false); setConfirmingDelete(true); }}
-                    disabled={deleting}
-                    className="w-full px-3 py-2.5 text-left text-sm font-medium text-red-500 disabled:opacity-40"
-                  >
-                    {deleting ? "Deleting…" : "Delete post"}
-                  </button>
+                <div className="absolute right-0 top-9 z-10 w-40 overflow-hidden rounded-xl2 glass-card shadow-lg">
+                  {isOwner ? (
+                    <button
+                      onClick={() => { setMenuOpen(false); setConfirmingDelete(true); }}
+                      disabled={deleting}
+                      className="w-full px-3 py-2.5 text-left text-sm font-medium text-red-500 disabled:opacity-40"
+                    >
+                      {deleting ? "Deleting…" : "Delete post"}
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => { setMenuOpen(false); setReporting(true); }}
+                        className="w-full px-3 py-2.5 text-left text-sm font-medium"
+                      >
+                        Report post
+                      </button>
+                      <button
+                        onClick={() => { setMenuOpen(false); setConfirmingBlock(true); }}
+                        className="w-full border-t border-black/5 px-3 py-2.5 text-left text-sm font-medium text-red-500 dark:border-white/5"
+                      >
+                        Block @{username ?? "user"}
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -211,6 +272,8 @@ export default function PostCard({ post, onDeleted, fullCaption }: { post: Post;
         liked={liked}
         likeCount={likeCount}
         onToggleLike={toggleLike}
+        initialSaved={stats?.saved}
+        initialCommentCount={stats?.commentCount}
       />
 
       {caption && (
@@ -233,6 +296,21 @@ export default function PostCard({ post, onDeleted, fullCaption }: { post: Post;
           onConfirm={() => { setConfirmingDelete(false); handleDelete(); }}
           onCancel={() => setConfirmingDelete(false)}
         />
+      )}
+
+      {confirmingBlock && (
+        <ConfirmModal
+          title={`Block @${username ?? "user"}?`}
+          message="You won't see each other's posts, comments or messages. You can unblock them any time from their profile."
+          confirmLabel="Block"
+          danger
+          onConfirm={() => { setConfirmingBlock(false); handleBlock(); }}
+          onCancel={() => setConfirmingBlock(false)}
+        />
+      )}
+
+      {reporting && (
+        <ReportSheet title="Report post" onSubmit={handleReport} onClose={() => setReporting(false)} />
       )}
 
       {lightboxOpen && <PostMediaLightbox post={post} onClose={() => setLightboxOpen(false)} />}

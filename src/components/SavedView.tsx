@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import type { Post } from "@/types/database";
 import PostCard from "./PostCard";
+import { getUserLocal } from "@/lib/authUser";
 
 export default function SavedView() {
   const router = useRouter();
@@ -16,7 +17,7 @@ export default function SavedView() {
   }, []);
 
   async function load() {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await getUserLocal();
     if (!user) {
       setLoading(false);
       return;

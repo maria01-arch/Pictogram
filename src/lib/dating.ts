@@ -1,8 +1,10 @@
 import { supabase } from "./supabaseClient";
 import type { DatingProfile, Profile } from "../types/database";
+import { getUserLocal } from "@/lib/authUser";
+import { getBlockedUserIds } from "@/lib/block";
 
 export async function getMyDatingProfile(): Promise<DatingProfile | null> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getUserLocal();
   if (!user) return null;
   const { data } = await supabase.from("dating_profiles").select("*").eq("user_id", user.id).maybeSingle();
   return data;
@@ -11,7 +13,7 @@ export async function getMyDatingProfile(): Promise<DatingProfile | null> {
 // Records an explicit 18+ self-attestation, timestamped. Does not enable
 // the profile by itself — enableDating still needs to be called after.
 export async function confirmDatingAge() {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getUserLocal();
   if (!user) throw new Error("You must be signed in.");
   const { error } = await supabase
     .from("dating_profiles")
@@ -20,7 +22,7 @@ export async function confirmDatingAge() {
 }
 
 export async function enableDating(bio: string) {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getUserLocal();
   if (!user) throw new Error("You must be signed in.");
   const { error } = await supabase
     .from("dating_profiles")
@@ -39,7 +41,7 @@ export async function enableDating(bio: string) {
 }
 
 export async function disableDating() {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getUserLocal();
   if (!user) throw new Error("You must be signed in.");
   const { error } = await supabase.from("dating_profiles").update({ enabled: false }).eq("user_id", user.id);
   if (error) throw error;
@@ -51,7 +53,7 @@ export interface DatingCandidate {
 }
 
 export async function fetchCandidates(onlineUserIds: string[]): Promise<DatingCandidate[]> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getUserLocal();
   if (!user) return [];
 
   const ids = onlineUserIds.filter((id) => id !== user.id);
@@ -63,13 +65,15 @@ export async function fetchCandidates(onlineUserIds: string[]): Promise<DatingCa
     .in("user_id", ids)
     .eq("enabled", true);
 
+  const blocked = await getBlockedUserIds();
   return (datingRows ?? [])
-    .filter((row: any) => row.profiles)
+    // 18+ only (age is set once on the profile) and never people we blocked / who blocked us.
+    .filter((row: any) => row.profiles && (row.profiles.age ?? 0) >= 18 && !blocked.has(row.profiles.id))
     .map((row: any) => ({ profile: row.profiles as Profile, bio: row.bio }));
 }
 
 export async function likeUser(likedId: string): Promise<boolean> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getUserLocal();
   if (!user) throw new Error("You must be signed in.");
 
   const { error } = await supabase.from("dating_likes").insert({ liker_id: user.id, liked_id: likedId });
@@ -93,7 +97,7 @@ export interface DatingMatchSummary {
 }
 
 export async function fetchMatches(): Promise<DatingMatchSummary[]> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getUserLocal();
   if (!user) return [];
 
   const { data } = await supabase
@@ -102,8 +106,27 @@ export async function fetchMatches(): Promise<DatingMatchSummary[]> {
     .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
     .order("created_at", { ascending: false });
 
-  return (data ?? []).map((row: any) => ({
-    profile: row.user_a === user.id ? row.profile_b : row.profile_a,
-    matchedAt: row.created_at,
-  }));
+  const blocked = await getBlockedUserIds();
+  return (data ?? [])
+    .map((row: any) => ({
+      profile: row.user_a === user.id ? row.profile_b : row.profile_a,
+      matchedAt: row.created_at,
+    }))
+    .filter((m) => m.profile && !blocked.has(m.profile.id));
+}
+
+// The profile's age (null = not set yet). Dating needs it to be 18 or more.
+export async function getMyAge(): Promise<number | null> {
+  const { data: { user } } = await getUserLocal();
+  if (!user) return null;
+  const { data } = await supabase.from("profiles").select("age").eq("id", user.id).maybeSingle();
+  return data?.age ?? null;
+}
+
+// Age can only be set once (the database refuses later changes).
+export async function saveMyAge(age: number) {
+  const { data: { user } } = await getUserLocal();
+  if (!user) throw new Error("You must be signed in.");
+  const { error } = await supabase.from("profiles").update({ age }).eq("id", user.id);
+  if (error) throw error;
 }

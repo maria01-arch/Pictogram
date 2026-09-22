@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { getUserLocal } from "@/lib/authUser";
 
 declare global {
   interface Window {
@@ -26,7 +27,7 @@ export default function OneSignalInit() {
         safari_web_id: "web.onesignal.auto.26872e49-0741-4e76-94b8-10ddfedc5443",
       });
 
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await getUserLocal();
       if (user) {
         await OneSignal.login(user.id);
       }

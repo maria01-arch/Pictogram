@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import CommentsSheet from "./CommentsSheet";
+import { getUserLocal } from "@/lib/authUser";
 
 export default function PostActions({
   postId,
@@ -10,25 +11,35 @@ export default function PostActions({
   liked,
   likeCount,
   onToggleLike,
+  initialSaved,
+  initialCommentCount,
 }: {
   postId: string;
   postOwnerId?: string;
   liked: boolean;
   likeCount: number;
   onToggleLike: () => void;
+  // Provided by the feed (already fetched) so we don't query per post.
+  initialSaved?: boolean;
+  initialCommentCount?: number;
 }) {
-  const [saved, setSaved] = useState(false);
-  const [commentCount, setCommentCount] = useState(0);
+  const [saved, setSaved] = useState(initialSaved ?? false);
+  const [commentCount, setCommentCount] = useState(initialCommentCount ?? 0);
   const [showComments, setShowComments] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    load();
+    if (initialSaved !== undefined && initialCommentCount !== undefined) {
+      getUserLocal().then(({ data }) => setUserId(data.user?.id ?? null));
+    } else {
+      load();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postId]);
 
   async function load() {
     const [{ data: { user } }, commentsCountRes] = await Promise.all([
-      supabase.auth.getUser(),
+      getUserLocal(),
       supabase.from("comments").select("*", { count: "exact", head: true }).eq("post_id", postId),
     ]);
 
@@ -98,7 +109,12 @@ export default function PostActions({
         </button>
       </div>
 
-      {showComments && <CommentsSheet postId={postId} postOwnerId={postOwnerId} onClose={() => setShowComments(false)} />}
+      {showComments && <CommentsSheet
+          postId={postId}
+          postOwnerId={postOwnerId}
+          onCountChange={(delta) => setCommentCount((c) => Math.max(0, c + delta))}
+          onClose={() => setShowComments(false)}
+        />}
     </>
   );
 }

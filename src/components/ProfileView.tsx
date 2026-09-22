@@ -17,6 +17,11 @@ import { ProfileSkeleton } from "./Skeleton";
 import AvatarActionSheet from "./AvatarActionSheet";
 import StoryViewer from "./StoryViewer";
 import type { Story } from "@/types/database";
+import { getUserLocal } from "@/lib/authUser";
+import ReportSheet from "./ReportSheet";
+import { submitReport } from "@/lib/reports";
+
+const PROFILE_PAGE_SIZE = 60;
 
 export default function ProfileView({ username: rawUsername }: { username: string }) {
   const username = rawUsername.trim();
@@ -40,6 +45,9 @@ export default function ProfileView({ username: rawUsername }: { username: strin
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [likeCount, setLikeCount] = useState(0);
+  const [reportingUser, setReportingUser] = useState(false);
+  const [hasMorePosts, setHasMorePosts] = useState(false);
+  const [loadingMorePosts, setLoadingMorePosts] = useState(false);
 
   useEffect(() => {
     load();
@@ -56,7 +64,7 @@ export default function ProfileView({ username: rawUsername }: { username: strin
     }
     setProfile(p);
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await getUserLocal();
     setIsSelf(user?.id === p.id);
 
     const { data: postRows } = await supabase
@@ -64,20 +72,20 @@ export default function ProfileView({ username: rawUsername }: { username: strin
       .select("*, post_media(*)")
       .eq("user_id", p.id)
       .order("created_at", { ascending: false })
-      .order("position", { foreignTable: "post_media", ascending: true });
+      .order("position", { foreignTable: "post_media", ascending: true })
+      .range(0, PROFILE_PAGE_SIZE - 1);
     setPosts(postRows ?? []);
+    setHasMorePosts((postRows ?? []).length === PROFILE_PAGE_SIZE);
 
-    const postIds = (postRows ?? []).map((row) => row.id);
     const [followerRes, followingRes, likesRes] = await Promise.all([
       supabase.from("follows").select("*", { count: "exact", head: true }).eq("following_id", p.id).eq("status", "accepted"),
       supabase.from("follows").select("*", { count: "exact", head: true }).eq("follower_id", p.id).eq("status", "accepted"),
-      postIds.length > 0
-        ? supabase.from("likes").select("*", { count: "exact", head: true }).in("post_id", postIds)
-        : Promise.resolve({ count: 0 }),
+      // One server-side count instead of sending every post id in the URL.
+      supabase.rpc("profile_like_count", { target_user: p.id }),
     ]);
     setFollowerCount(followerRes.count ?? 0);
     setFollowingCount(followingRes.count ?? 0);
-    setLikeCount(likesRes.count ?? 0);
+    setLikeCount(Number((likesRes as any).data ?? 0));
 
     const { data: storyRows } = await supabase
       .from("stories")
@@ -93,6 +101,36 @@ export default function ProfileView({ username: rawUsername }: { username: strin
     }
     setLoading(false);
     done();
+  }
+
+  async function loadMorePosts() {
+    if (!profile || loadingMorePosts) return;
+    setLoadingMorePosts(true);
+    const { data: more } = await supabase
+      .from("posts")
+      .select("*, post_media(*)")
+      .eq("user_id", profile.id)
+      .order("created_at", { ascending: false })
+      .order("position", { foreignTable: "post_media", ascending: true })
+      .range(posts.length, posts.length + PROFILE_PAGE_SIZE - 1);
+    setPosts((prev) => {
+      const known = new Set(prev.map((x) => x.id));
+      return [...prev, ...(more ?? []).filter((x) => !known.has(x.id))];
+    });
+    setHasMorePosts((more ?? []).length === PROFILE_PAGE_SIZE);
+    setLoadingMorePosts(false);
+  }
+
+  async function handleReportUser(category: string, details: string) {
+    if (!profile) return;
+    await submitReport({
+      targetType: "user",
+      reportedUserId: profile.id,
+      category,
+      details,
+      evidence: [profile.display_name, profile.bio].filter(Boolean).join(" — ") || null,
+      evidenceUrl: profile.avatar_url ?? null,
+    });
   }
 
   async function handleFollow() {
@@ -181,6 +219,12 @@ export default function ProfileView({ username: rawUsername }: { username: strin
             </button>
             {menuOpen && (
               <div className="absolute right-0 top-7 z-10 w-40 overflow-hidden rounded-xl2 glass-card shadow-lg">
+                <button
+                  onClick={() => { setMenuOpen(false); setReportingUser(true); }}
+                  className="w-full border-b border-black/5 px-3 py-2.5 text-left text-sm font-medium dark:border-white/5"
+                >
+                  Report user
+                </button>
                 {blocked.blockedByMe ? (
                   <button onClick={handleUnblock} className="w-full px-3 py-2.5 text-left text-sm font-medium">
                     Unblock
@@ -287,6 +331,18 @@ export default function ProfileView({ username: rawUsername }: { username: strin
           </div>
 
           {posts.length === 0 && <p className="mt-10 text-center text-sm text-ink-muted">No posts yet.</p>}
+
+          {hasMorePosts && (
+            <div className="mt-4 flex justify-center">
+              <button
+                onClick={loadMorePosts}
+                disabled={loadingMorePosts}
+                className="rounded-full bg-black/5 px-5 py-2 text-sm font-semibold disabled:opacity-50 dark:bg-white/10"
+              >
+                {loadingMorePosts ? "Loading…" : "Load more"}
+              </button>
+            </div>
+          )}
         </>
       )}
 
@@ -305,6 +361,14 @@ export default function ProfileView({ username: rawUsername }: { username: strin
             />
           </div>
         </div>
+      )}
+
+      {reportingUser && profile && (
+        <ReportSheet
+          title={`Report @${profile.username}`}
+          onSubmit={handleReportUser}
+          onClose={() => setReportingUser(false)}
+        />
       )}
 
       {confirmingBlock && profile && (

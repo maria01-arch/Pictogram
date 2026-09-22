@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { compressImage } from "@/lib/compressImage";
 import { getErrorMessage } from "@/lib/errorMessage";
 import type { Profile } from "@/types/database";
+import { getUserLocal } from "@/lib/authUser";
 
 export default function ProfileEditForm() {
   const router = useRouter();
@@ -23,7 +24,7 @@ export default function ProfileEditForm() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await getUserLocal();
       if (!user) return;
 
       const { data, error } = await supabase

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rateLimit } from "@/lib/rateLimit";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { ensureAiBotProfile } from "@/lib/ensureAiBotProfile";
@@ -75,7 +76,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
-  const body = await request.json();
+  let body: any;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
+
+  // Stop one account from burning the shared AI quota.
+  if (
+    !(await rateLimit(user.id, body?.type === "chat" ? "ai_chat" : "ai_caption", body?.type === "chat" ? 60 : 30, 3600))
+  ) {
+    return NextResponse.json({ error: "You're going a bit fast — try again in a little while." }, { status: 429 });
+  }
 
   if (body.type === "caption") {
     const topic = String(body.topic ?? "").slice(0, 300) || "a photo I'm sharing";

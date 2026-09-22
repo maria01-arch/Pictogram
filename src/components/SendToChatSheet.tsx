@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { sendWallpaperToChat } from "@/lib/gallery";
 import Portal from "./Portal";
 import { useScrollLock } from "@/lib/useScrollLock";
+import { getUserLocal } from "@/lib/authUser";
 
 interface Target {
   conversationId: string;
@@ -34,7 +35,7 @@ export default function SendToChatSheet({ imageUrl, onClose }: { imageUrl: strin
     (async () => {
       const {
         data: { user },
-      } = await supabase.auth.getUser();
+      } = await getUserLocal();
       if (!user) return setLoading(false);
 
       const { data: mine } = await supabase.from("conversation_participants").select("conversation_id").eq("user_id", user.id);

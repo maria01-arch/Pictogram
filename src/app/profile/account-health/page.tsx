@@ -15,6 +15,7 @@ export default function AccountHealthPage() {
   const [strikes, setStrikes] = useState<AccountStrike[]>([]);
   const [loading, setLoading] = useState(true);
   const [appealDraft, setAppealDraft] = useState<Record<string, string>>({});
+  const [appealError, setAppealError] = useState<string | null>(null);
 
   useEffect(() => {
     loadStrikes();
@@ -46,8 +47,10 @@ export default function AccountHealthPage() {
 
     if (error) {
       console.error("Failed to submit appeal:", error.message);
+      setAppealError("Couldn't submit your appeal. Please try again.");
       return;
     }
+    setAppealError(null);
     loadStrikes();
   }
 
@@ -107,8 +110,10 @@ export default function AccountHealthPage() {
                   onChange={(e) => setAppealDraft((prev) => ({ ...prev, [strike.id]: e.target.value }))}
                   placeholder="Explain why you believe this strike should be removed…"
                   rows={3}
+                  maxLength={2000}
                   className="w-full rounded-lg bg-black/5 p-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-from dark:bg-white/10"
                 />
+                {appealError && <p className="text-xs text-red-500">{appealError}</p>}
                 <button
                   onClick={() => submitAppeal(strike.id)}
                   disabled={!appealDraft[strike.id]?.trim()}
@@ -116,6 +121,15 @@ export default function AccountHealthPage() {
                 >
                   Submit appeal
                 </button>
+              </div>
+            )}
+
+            {(strike.status === "upheld" || strike.status === "overturned") && (
+              <div className="mt-3 rounded-lg bg-black/5 p-2.5 text-xs dark:bg-white/10">
+                <p className="font-semibold">
+                  {strike.status === "overturned" ? "Appeal accepted — this strike was removed." : "Appeal reviewed — the strike stands."}
+                </p>
+                {strike.reviewer_notes && <p className="mt-1 text-ink-muted">{strike.reviewer_notes}</p>}
               </div>
             )}
 

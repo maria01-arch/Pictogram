@@ -1,8 +1,9 @@
 import { supabase } from "./supabaseClient";
+import { getUserLocal } from "@/lib/authUser";
 
 // Finds an existing 1:1 conversation with otherUserId, or creates one.
 export async function getOrCreateDirectConversation(otherUserId: string): Promise<string> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getUserLocal();
   if (!user) throw new Error("You must be signed in.");
 
   const { data: mine } = await supabase

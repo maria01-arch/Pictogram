@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { getUserLocal } from "@/lib/authUser";
 
 // Preference order — Opus-in-WebM is what most Android browsers/WebViews
 // support; MP4/AAC covers Safari/iOS if this ever runs there.
@@ -22,7 +23,7 @@ export function isVoiceNotePath(path: string): boolean {
 export async function uploadChatVoice(blob: Blob, mimeType: string): Promise<string> {
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getUserLocal();
   if (!user) throw new Error("You must be signed in.");
 
   const ext = mimeType.includes("mp4") ? "m4a" : "webm";

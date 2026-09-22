@@ -7,6 +7,9 @@ import { createNotification } from "@/lib/notifications";
 import { useTopLoading } from "./TopLoadingBar";
 import { ListRowSkeleton } from "./Skeleton";
 import type { Profile } from "@/types/database";
+import { getUserLocal } from "@/lib/authUser";
+import { toggleFollow } from "@/lib/follow";
+import { getBlockedUserIds } from "@/lib/block";
 
 type Tab = "requests" | "friends" | "suggestions";
 
@@ -25,7 +28,7 @@ export default function FriendsView() {
   async function load() {
     start();
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await getUserLocal();
       if (!user) return;
 
       const [{ data: pendingRows }, { data: acceptedRows }, { data: allProfiles }] = await Promise.all([
@@ -52,7 +55,8 @@ export default function FriendsView() {
       });
       setFriends(Array.from(friendMap.values()));
 
-      const excludeIds = new Set([user.id, ...friendMap.keys(), ...requestList.map((r) => r.id)]);
+      const blocked = await getBlockedUserIds();
+      const excludeIds = new Set([user.id, ...friendMap.keys(), ...requestList.map((r) => r.id), ...blocked]);
       setSuggestions((allProfiles ?? []).filter((p) => !excludeIds.has(p.id)));
     } finally {
       setLoading(false);
@@ -61,32 +65,30 @@ export default function FriendsView() {
   }
 
   async function accept(followerId: string) {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await getUserLocal();
     if (!user) return;
     await supabase.from("follows").update({ status: "accepted" }).eq("follower_id", followerId).eq("following_id", user.id);
 
-    const { data: me } = await supabase.from("profiles").select("username").eq("id", user.id).single();
-    createNotification({
-      targetUserId: followerId,
-      type: "follow_accepted",
-      pushTitle: "Follow request accepted",
-      pushBody: `${me?.username ?? "Someone"} accepted your follow request`,
-    });
+    createNotification({ targetUserId: followerId, type: "follow_accepted" });
 
     load();
   }
 
   async function decline(followerId: string) {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await getUserLocal();
     if (!user) return;
     await supabase.from("follows").delete().eq("follower_id", followerId).eq("following_id", user.id);
     load();
   }
 
   async function followBack(targetId: string) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    await supabase.from("follows").insert({ follower_id: user.id, following_id: targetId, status: "accepted" });
+    // Goes through the normal follow flow so the other person's approval
+    // setting (and blocks) are respected — it used to force "accepted".
+    try {
+      await toggleFollow(targetId, "none");
+    } catch (err) {
+      console.error("Follow failed:", err);
+    }
     load();
   }
 

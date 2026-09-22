@@ -1,10 +1,11 @@
 import { supabase } from "./supabaseClient";
 import { createNotification } from "./notifications";
+import { getUserLocal } from "@/lib/authUser";
 
 export type FollowRelation = "none" | "pending" | "following";
 
 export async function getFollowRelation(targetUserId: string): Promise<FollowRelation> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getUserLocal();
   if (!user || user.id === targetUserId) return "none";
 
   const { data } = await supabase
@@ -19,33 +20,29 @@ export async function getFollowRelation(targetUserId: string): Promise<FollowRel
 }
 
 export async function toggleFollow(targetUserId: string, currentRelation: FollowRelation) {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getUserLocal();
   if (!user) throw new Error("You must be signed in.");
 
   if (currentRelation === "none") {
-    const { data: target } = await supabase
-      .from("profiles")
-      .select("requires_follow_approval")
-      .eq("id", targetUserId)
-      .single();
-
-    const willBePending = !!target?.requires_follow_approval;
-
+    // The database decides whether this becomes "pending" or "accepted"
+    // (based on the other person's approval setting) — we only ask to follow.
     const { error } = await supabase.from("follows").insert({
       follower_id: user.id,
       following_id: targetUserId,
-      status: willBePending ? "pending" : "accepted",
     });
     if (error) throw error;
 
-    const { data: me } = await supabase.from("profiles").select("username").eq("id", user.id).single();
+    const { data: row } = await supabase
+      .from("follows")
+      .select("status")
+      .eq("follower_id", user.id)
+      .eq("following_id", targetUserId)
+      .maybeSingle();
+    const willBePending = row?.status !== "accepted";
+
     createNotification({
       targetUserId,
       type: willBePending ? "follow_request" : "follow_accepted",
-      pushTitle: willBePending ? "New follow request" : "New follower",
-      pushBody: willBePending
-        ? `${me?.username ?? "Someone"} wants to follow you`
-        : `${me?.username ?? "Someone"} started following you`,
     });
   } else {
     const { error } = await supabase

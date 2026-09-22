@@ -1,5 +1,6 @@
 import { supabase } from "./supabaseClient";
 import type { PaymentMethod, CryptoCurrency, VerificationApplication } from "@/types/database";
+import { getUserLocal } from "@/lib/authUser";
 
 async function uploadDoc(file: File, userId: string, prefix: string): Promise<string> {
   const path = `${userId}/${prefix}-${crypto.randomUUID()}-${file.name}`;
@@ -11,7 +12,7 @@ async function uploadDoc(file: File, userId: string, prefix: string): Promise<st
 }
 
 export async function getMyLatestApplication(): Promise<VerificationApplication | null> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getUserLocal();
   if (!user) return null;
   const { data } = await supabase
     .from("verification_applications")
@@ -38,7 +39,7 @@ export async function submitVerificationApplication({
   cryptoCurrency: CryptoCurrency | null;
   txScreenshotFile: File | null;
 }) {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getUserLocal();
   if (!user) throw new Error("You must be signed in.");
 
   const idDocumentPath = await uploadDoc(idFile, user.id, "id");

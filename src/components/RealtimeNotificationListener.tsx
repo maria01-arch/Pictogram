@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { getUserLocal } from "@/lib/authUser";
 
 const MESSAGES: Record<string, string> = {
   like: "liked your post",
@@ -9,6 +10,7 @@ const MESSAGES: Record<string, string> = {
   message: "sent you a message",
   follow_request: "wants to follow you",
   follow_accepted: "accepted your follow request",
+  account_strike: "— there is an update on your account health",
 };
 
 // Complements OneSignal's real push (which needs a service worker, and
@@ -22,7 +24,7 @@ export default function RealtimeNotificationListener() {
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
+    getUserLocal().then(async ({ data: { user } }) => {
       if (!user) return;
 
       const notifSupported = typeof window !== "undefined" && "Notification" in window;

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rateLimit } from "@/lib/rateLimit";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 
 const WALLHAVEN_URL = "https://wallhaven.cc/api/v1/search";
@@ -10,6 +11,10 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  }
+
+  if (!(await rateLimit(user.id, "gallery", 300, 3600))) {
+    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
   }
 
   const apiKey = process.env.WALLHAVEN_API_KEY;

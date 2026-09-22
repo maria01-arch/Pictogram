@@ -2,16 +2,18 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import type { Post } from "@/types/database";
+import type { Post, PostStats } from "@/types/database";
 import PostCard from "./PostCard";
 import StoriesBar from "./StoriesBar";
 import { useTopLoading } from "./TopLoadingBar";
 
 const PAGE_SIZE = 10;
 
+type FeedPost = Post & { stats: PostStats };
+
 export default function HomeFeed() {
   const { start, done } = useTopLoading();
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [posts, setPosts] = useState<FeedPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -22,7 +24,7 @@ export default function HomeFeed() {
 
   const loadPosts = useCallback(async (offset: number) => {
     start();
-    const { data: rankedRows, error: rankError } = await supabase.rpc("feed_ranked_ids", {
+    const { data: rankedRows, error: rankError } = await supabase.rpc("feed_ranked_v2", {
       page_limit: PAGE_SIZE,
       page_offset: offset,
       seed: seedRef.current,
@@ -36,6 +38,17 @@ export default function HomeFeed() {
     }
 
     const ids = rankedRows.map((r: { id: string }) => r.id);
+    const statsById = new Map<string, PostStats>(
+      rankedRows.map((r: any) => [
+        r.id,
+        {
+          likeCount: Number(r.like_count ?? 0),
+          commentCount: Number(r.comment_count ?? 0),
+          liked: !!r.liked,
+          saved: !!r.saved,
+        },
+      ])
+    );
     const { data, error } = await supabase
       .from("posts")
       .select("*, profiles!posts_user_id_fkey(username, avatar_url, is_verified), post_media(*)")
@@ -51,7 +64,12 @@ export default function HomeFeed() {
     // .in() doesn't preserve the id order we asked for — re-sort to match
     // the ranking the RPC actually gave us.
     const rank = new Map<string, number>(ids.map((id: string, i: number) => [id, i]));
-    const ordered = [...(data ?? [])].sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
+    const ordered: FeedPost[] = [...(data ?? [])]
+      .sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0))
+      .map((p) => ({
+        ...p,
+        stats: statsById.get(p.id) ?? { likeCount: 0, commentCount: 0, liked: false, saved: false },
+      }));
 
     setPosts((prev) => (offset === 0 ? ordered : [...prev, ...ordered]));
     setHasMore(ids.length === PAGE_SIZE);
@@ -94,7 +112,7 @@ export default function HomeFeed() {
       ) : (
         <div className="pt-3">
           {posts.map((post) => (
-            <PostCard key={post.id} post={post} onDeleted={(id) => setPosts((prev) => prev.filter((p) => p.id !== id))} />
+            <PostCard key={post.id} post={post} stats={post.stats} onDeleted={(id) => setPosts((prev) => prev.filter((p) => p.id !== id))} />
           ))}
 
           <div ref={sentinelRef} className="h-4" />

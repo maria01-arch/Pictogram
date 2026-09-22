@@ -10,10 +10,24 @@ import ConfirmModal from "./ConfirmModal";
 import type { Comment, CommentReaction } from "@/types/database";
 import Portal from "./Portal";
 import { useScrollLock } from "@/lib/useScrollLock";
+import { getUserLocal } from "@/lib/authUser";
+import { getBlockedUserIds } from "@/lib/block";
+import { submitReport } from "@/lib/reports";
+import ReportSheet from "./ReportSheet";
 
 const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
-export default function CommentsSheet({ postId, postOwnerId, onClose }: { postId: string; postOwnerId?: string; onClose: () => void }) {
+export default function CommentsSheet({
+  postId,
+  postOwnerId,
+  onClose,
+  onCountChange,
+}: {
+  postId: string;
+  postOwnerId?: string;
+  onClose: () => void;
+  onCountChange?: (delta: number) => void;
+}) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [reactions, setReactions] = useState<CommentReaction[]>([]);
   const [draft, setDraft] = useState("");
@@ -22,11 +36,12 @@ export default function CommentsSheet({ postId, postOwnerId, onClose }: { postId
   const [userId, setUserId] = useState<string | null>(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [pickerForId, setPickerForId] = useState<string | null>(null);
+  const [reportingComment, setReportingComment] = useState<Comment | null>(null);
   useScrollLock();
 
   useEffect(() => {
     load();
-    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
+    getUserLocal().then(({ data }) => setUserId(data.user?.id ?? null));
   }, [postId]);
 
   async function load() {
@@ -35,10 +50,13 @@ export default function CommentsSheet({ postId, postOwnerId, onClose }: { postId
       .select("*, profiles!comments_user_id_fkey(username, avatar_url, is_verified)")
       .eq("post_id", postId)
       .order("created_at", { ascending: true });
-    setComments(commentRows ?? []);
+    // Hide comments from anyone I blocked (or who blocked me).
+    const blocked = await getBlockedUserIds();
+    const visible = (commentRows ?? []).filter((c) => !blocked.has(c.user_id));
+    setComments(visible);
     setLoading(false);
 
-    const ids = (commentRows ?? []).map((c) => c.id);
+    const ids = visible.map((c) => c.id);
     if (ids.length === 0) {
       setReactions([]);
       return;
@@ -52,22 +70,16 @@ export default function CommentsSheet({ postId, postOwnerId, onClose }: { postId
     if (!content) return;
     setError(null);
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await getUserLocal();
     if (!user) return setError("You must be signed in to comment.");
 
     setDraft("");
     const { error } = await supabase.from("comments").insert({ post_id: postId, user_id: user.id, content });
     if (error) return setError(getErrorMessage(error));
 
+    onCountChange?.(1);
     if (postOwnerId) {
-      const { data: me } = await supabase.from("profiles").select("username").eq("id", user.id).single();
-      createNotification({
-        targetUserId: postOwnerId,
-        type: "comment",
-        postId,
-        pushTitle: "New comment",
-        pushBody: `${me?.username ?? "Someone"} commented on your post`,
-      });
+      createNotification({ targetUserId: postOwnerId, type: "comment", postId });
     }
 
     load();
@@ -77,6 +89,20 @@ export default function CommentsSheet({ postId, postOwnerId, onClose }: { postId
     const { error } = await supabase.from("comments").delete().eq("id", commentId);
     if (error) return setError(getErrorMessage(error));
     setComments((prev) => prev.filter((c) => c.id !== commentId));
+    onCountChange?.(-1);
+  }
+
+  async function handleReportComment(category: string, details: string) {
+    if (!reportingComment) return;
+    await submitReport({
+      targetType: "comment",
+      reportedUserId: reportingComment.user_id,
+      commentId: reportingComment.id,
+      postId,
+      category,
+      details,
+      evidence: reportingComment.content,
+    });
   }
 
   async function toggleReaction(commentId: string, emoji: string) {
@@ -169,10 +195,16 @@ export default function CommentsSheet({ postId, postOwnerId, onClose }: { postId
                     )}
                   </div>
                 </div>
-                {c.user_id === userId && (
+                {c.user_id === userId ? (
                   <button onClick={() => setConfirmingDeleteId(c.id)} className="shrink-0 text-xs text-red-500">
                     Delete
                   </button>
+                ) : (
+                  userId && (
+                    <button onClick={() => setReportingComment(c)} className="shrink-0 text-xs text-ink-muted">
+                      Report
+                    </button>
+                  )
                 )}
               </div>
             );
@@ -194,6 +226,14 @@ export default function CommentsSheet({ postId, postOwnerId, onClose }: { postId
           </button>
         </div>
       </div>
+
+      {reportingComment && (
+        <ReportSheet
+          title="Report comment"
+          onSubmit={handleReportComment}
+          onClose={() => setReportingComment(null)}
+        />
+      )}
 
       {confirmingDeleteId && (
         <ConfirmModal

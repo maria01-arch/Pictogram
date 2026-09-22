@@ -7,6 +7,7 @@ import { useTopLoading } from "./TopLoadingBar";
 import { ListRowSkeleton } from "./Skeleton";
 import VerifiedBadge from "./VerifiedBadge";
 import type { Notification } from "@/types/database";
+import { getUserLocal } from "@/lib/authUser";
 
 const MESSAGES: Record<Notification["type"], (username: string) => string> = {
   like: (u) => `${u} liked your post`,
@@ -14,12 +15,13 @@ const MESSAGES: Record<Notification["type"], (username: string) => string> = {
   message: (u) => `${u} sent you a message`,
   follow_request: (u) => `${u} wants to follow you`,
   follow_accepted: (u) => `${u} accepted your follow request`,
-  account_strike: () => `Your account received a strike — tap to see details`,
+  account_strike: () => `There is an update on your account health — tap to see details`,
 };
 
 function linkFor(n: Notification): string {
   if (n.type === "account_strike") return "/profile/account-health";
   if (n.type === "message" && n.conversation_id) return `/chat/${n.conversation_id}`;
+  if ((n.type === "like" || n.type === "comment") && n.post_id) return `/post/${n.post_id}`;
   if ((n.type === "follow_request" || n.type === "follow_accepted")) return "/friends";
   if (n.profiles) return `/profile/${(n.profiles as any).username}`;
   return "/";
@@ -37,7 +39,7 @@ export default function NotificationsView() {
   async function load() {
     start();
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await getUserLocal();
       if (!user) return;
 
       const { data } = await supabase

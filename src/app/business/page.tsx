@@ -1,4 +1,8 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { isNativeApp } from "@/lib/platform";
 
 const STUB_ITEMS = [
   { label: "DM configuration", description: "Set up automated replies and inbox rules" },
@@ -6,19 +10,28 @@ const STUB_ITEMS = [
 ];
 
 export default function BusinessPage() {
+  // The paid verification badge is hidden inside the installed app (see lib/platform.ts).
+  const [inApp, setInApp] = useState(true); // start hidden to avoid a flash in the app
+  useEffect(() => setInApp(isNativeApp()), []);
+
   return (
     <div className="px-4 pb-8 pt-4">
       <h2 className="text-lg font-bold">Business console</h2>
       <p className="mt-1 text-sm text-ink-muted">Tools for creators and businesses.</p>
 
       <div className="mt-5 overflow-hidden rounded-xl2 glass-card">
-        <Link href="/business/verify" className="block px-4 py-3.5 transition hover:bg-black/5 dark:hover:bg-white/5">
-          <p className="text-sm font-semibold">Get verified</p>
-          <p className="mt-0.5 text-xs text-ink-muted">Apply for a verification badge</p>
-        </Link>
+        {!inApp && (
+          <Link href="/business/verify" className="block px-4 py-3.5 transition hover:bg-black/5 dark:hover:bg-white/5">
+            <p className="text-sm font-semibold">Get verified</p>
+            <p className="mt-0.5 text-xs text-ink-muted">Apply for a verification badge</p>
+          </Link>
+        )}
 
-        {STUB_ITEMS.map((item) => (
-          <div key={item.label} className="border-t border-black/5 px-4 py-3.5 dark:border-white/5">
+        {STUB_ITEMS.map((item, i) => (
+          <div
+            key={item.label}
+            className={`px-4 py-3.5 ${!inApp || i > 0 ? "border-t border-black/5 dark:border-white/5" : ""}`}
+          >
             <p className="text-sm font-semibold">{item.label}</p>
             <p className="mt-0.5 text-xs text-ink-muted">{item.description} — coming soon.</p>
           </div>

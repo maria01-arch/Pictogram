@@ -7,7 +7,7 @@ export async function uploadToR2(
   const res = await fetch("/api/r2-upload-url", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ filename, contentType, folder }),
+    body: JSON.stringify({ filename, contentType, folder, size: file.size }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to get an upload URL");

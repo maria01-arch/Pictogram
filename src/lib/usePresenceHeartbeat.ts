@@ -2,8 +2,9 @@
 
 import { useEffect } from "react";
 import { supabase } from "./supabaseClient";
+import { getUserLocal } from "@/lib/authUser";
 
-const HEARTBEAT_MS = 25_000;
+const HEARTBEAT_MS = 45_000;
 
 // Mount once (in AppChrome) for the lifetime of the authenticated app.
 export function usePresenceHeartbeat() {
@@ -16,7 +17,7 @@ export function usePresenceHeartbeat() {
       await supabase.from("profiles").update({ last_seen_at: new Date().toISOString() }).eq("id", userId);
     }
 
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    getUserLocal().then(({ data: { user } }) => {
       if (!user) return;
       userId = user.id;
       beat();
