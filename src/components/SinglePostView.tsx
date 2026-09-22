@@ -13,7 +13,7 @@ export default function SinglePostView({ postId }: { postId: string }) {
     let cancelled = false;
     supabase
       .from("posts")
-      .select("*, profiles!posts_user_id_fkey(username, avatar_url, is_verified), post_media(*)")
+      .select("*, profiles!posts_user_id_fkey(username, avatar_url, is_verified, disable_downloads, is_locked), post_media(*)")
       .eq("id", postId)
       .single()
       .then(({ data, error }) => {

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import CommentsSheet from "./CommentsSheet";
 import { getUserLocal } from "@/lib/authUser";
+import ShareSheet from "./ShareSheet";
 
 export default function PostActions({
   postId,
@@ -13,6 +14,10 @@ export default function PostActions({
   onToggleLike,
   initialSaved,
   initialCommentCount,
+  shareCaption,
+  shareMediaUrl,
+  shareMediaType,
+  disableDownload,
 }: {
   postId: string;
   postOwnerId?: string;
@@ -22,10 +27,15 @@ export default function PostActions({
   // Provided by the feed (already fetched) so we don't query per post.
   initialSaved?: boolean;
   initialCommentCount?: number;
+  shareCaption?: string | null;
+  shareMediaUrl?: string | null;
+  shareMediaType?: "image" | "video" | "text" | "carousel";
+  disableDownload?: boolean;
 }) {
   const [saved, setSaved] = useState(initialSaved ?? false);
   const [commentCount, setCommentCount] = useState(initialCommentCount ?? 0);
   const [showComments, setShowComments] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -63,18 +73,6 @@ export default function PostActions({
     }
   }
 
-  async function share() {
-    const url = `${window.location.origin}/post/${postId}`;
-    if (navigator.share) {
-      try {
-        await navigator.share({ url });
-      } catch {
-        // user cancelled — no-op
-      }
-    } else {
-      await navigator.clipboard.writeText(url);
-    }
-  }
 
   return (
     <>
@@ -96,7 +94,7 @@ export default function PostActions({
           {commentCount > 0 && <span className="text-xs font-semibold">{commentCount}</span>}
         </button>
 
-        <button onClick={share} aria-label="Share">
+        <button onClick={() => setShowShare(true)} aria-label="Share">
           <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
             <path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7M16 6l-4-4-4 4M12 2v14" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -108,6 +106,17 @@ export default function PostActions({
           </svg>
         </button>
       </div>
+
+      {showShare && (
+        <ShareSheet
+          url={`${window.location.origin}/post/${postId}`}
+          text={shareCaption?.trim() || "Check out this post"}
+          mediaUrl={shareMediaUrl}
+          mediaType={shareMediaType}
+          disableDownload={disableDownload}
+          onClose={() => setShowShare(false)}
+        />
+      )}
 
       {showComments && <CommentsSheet
           postId={postId}

@@ -19,8 +19,21 @@ export interface Profile {
   age?: number | null;
   suspended_at?: string | null;
   terms_accepted_at?: string | null;
+  dm_permission?: "everyone" | "people_i_follow";
+  comment_permission?: "everyone" | "people_i_follow";
+  disable_downloads?: boolean;
+  hide_following_list?: boolean;
+  is_locked?: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface FollowListEntry {
+  id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  is_verified: boolean;
 }
 
 export interface Post {
@@ -38,7 +51,7 @@ export interface Post {
   moderation_status: "pending" | "approved" | "flagged";
   cover_focal_x: number;
   cover_focal_y: number;
-  profiles?: Pick<Profile, "username" | "avatar_url" | "is_verified">;
+  profiles?: Pick<Profile, "username" | "avatar_url" | "is_verified" | "disable_downloads" | "is_locked">;
   post_media?: PostMedia[];
 }
 

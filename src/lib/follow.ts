@@ -1,6 +1,7 @@
 import { supabase } from "./supabaseClient";
 import { createNotification } from "./notifications";
 import { getUserLocal } from "@/lib/authUser";
+import type { FollowListEntry } from "@/types/database";
 
 export type FollowRelation = "none" | "pending" | "following";
 
@@ -52,4 +53,24 @@ export async function toggleFollow(targetUserId: string, currentRelation: Follow
       .eq("following_id", targetUserId);
     if (error) throw error;
   }
+}
+
+// Followers are always listable. Following can be hidden by the profile
+// owner (Settings → Privacy → "Who can see who you're following").
+export async function getFollowers(userId: string): Promise<FollowListEntry[]> {
+  const { data, error } = await supabase.rpc("list_followers", { target_user: userId });
+  if (error) throw error;
+  return (data ?? []) as FollowListEntry[];
+}
+
+export async function getFollowingVisibility(userId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("following_list_visible", { target_user: userId });
+  if (error) return true;
+  return data !== false;
+}
+
+export async function getFollowing(userId: string): Promise<FollowListEntry[]> {
+  const { data, error } = await supabase.rpc("list_following", { target_user: userId });
+  if (error) throw error;
+  return (data ?? []) as FollowListEntry[];
 }

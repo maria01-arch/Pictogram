@@ -154,14 +154,14 @@ export default function MenuPage() {
           onClick={() => setSwitcherOpen(true)}
           className="mt-2 flex w-full items-center gap-3 rounded-xl2 glass-card px-4 py-3 text-left transition hover:bg-black/5 dark:hover:bg-white/5"
         >
-          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-black/5 dark:bg-white/10">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-black/[0.04] dark:bg-white/[0.06]">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="text-ink-light/80 dark:text-ink-dark/80">
               <path d="M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
           <span className="flex-1 text-sm font-semibold">Switch account</span>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="shrink-0 text-ink-muted">
-            <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-ink-muted/60">
+            <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
       )}
@@ -176,26 +176,31 @@ export default function MenuPage() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-4 py-3.5 transition hover:bg-black/5 dark:hover:bg-white/5 ${
+                className={`flex items-center gap-3.5 px-4 py-3 transition active:bg-black/5 dark:active:bg-white/5 ${
                   i !== 0 ? "border-t border-black/5 dark:border-white/5" : ""
                 }`}
               >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.7"
-                  className="shrink-0 text-brand-from"
-                >
-                  <path d={item.icon} strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                {/* A calm, uniform neutral chip reads as one coherent list —
+                    the old bare brand-gradient icon repeated on every row is
+                    what made the menu feel like a toy palette. */}
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-black/[0.04] dark:bg-white/[0.06]">
+                  <svg
+                    width="17"
+                    height="17"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    className="text-ink-light/80 dark:text-ink-dark/80"
+                  >
+                    <path d={item.icon} strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold">{item.label}</p>
                   <p className="truncate text-xs text-ink-muted">{item.description}</p>
                 </div>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-ink-muted">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-ink-muted/60">
                   <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </Link>
@@ -206,7 +211,7 @@ export default function MenuPage() {
 
       <button
         onClick={handleLogout}
-        className="mt-6 w-full rounded-xl2 bg-red-500/10 py-3 text-sm font-semibold text-red-500"
+        className="mt-6 w-full rounded-xl2 border border-red-500/20 bg-red-500/[0.06] py-3 text-sm font-semibold text-red-500 transition active:bg-red-500/10"
       >
         Log out
       </button>

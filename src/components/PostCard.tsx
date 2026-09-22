@@ -274,6 +274,10 @@ export default function PostCard({
         onToggleLike={toggleLike}
         initialSaved={stats?.saved}
         initialCommentCount={stats?.commentCount}
+        shareCaption={post.caption}
+        shareMediaUrl={post.media_type === "carousel" ? post.post_media?.[0]?.media_url ?? post.media_url : post.media_url}
+        shareMediaType={post.media_type}
+        disableDownload={post.profiles?.disable_downloads}
       />
 
       {caption && (

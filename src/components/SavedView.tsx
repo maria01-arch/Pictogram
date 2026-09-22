@@ -25,7 +25,7 @@ export default function SavedView() {
 
     const { data, error } = await supabase
       .from("saves")
-      .select("created_at, posts(*, profiles!posts_user_id_fkey(username, avatar_url, is_verified), post_media(*))")
+      .select("created_at, posts(*, profiles!posts_user_id_fkey(username, avatar_url, is_verified, disable_downloads, is_locked), post_media(*))")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 

@@ -189,7 +189,10 @@ export default function SettingsView() {
       </div>
 
       <div className="mt-6 overflow-hidden rounded-xl2 glass-card">
-        <Link href="/privacy-policy" className="flex items-center justify-between px-4 py-3.5 text-sm font-semibold">
+        <Link href="/settings/privacy" className="flex items-center justify-between px-4 py-3.5 text-sm font-semibold">
+          Privacy <span className="text-ink-muted">›</span>
+        </Link>
+        <Link href="/privacy-policy" className="flex items-center justify-between border-t border-black/5 px-4 py-3.5 text-sm font-semibold dark:border-white/5">
           Privacy Policy <span className="text-ink-muted">›</span>
         </Link>
         <Link href="/terms" className="flex items-center justify-between border-t border-black/5 px-4 py-3.5 text-sm font-semibold dark:border-white/5">

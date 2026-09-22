@@ -46,7 +46,7 @@ function SearchViewInner() {
       supabase.from("profiles").select("*").ilike("username", `%${term}%`).limit(20),
       supabase
         .from("posts")
-        .select("*, profiles!posts_user_id_fkey(username, avatar_url, is_verified), post_media(*)")
+        .select("*, profiles!posts_user_id_fkey(username, avatar_url, is_verified, disable_downloads, is_locked), post_media(*)")
         .or(`caption.ilike.%${term}%,text_content.ilike.%${term}%`)
         .order("created_at", { ascending: false })
         .order("position", { foreignTable: "post_media", ascending: true })

@@ -20,8 +20,25 @@ import type { Story } from "@/types/database";
 import { getUserLocal } from "@/lib/authUser";
 import ReportSheet from "./ReportSheet";
 import { submitReport } from "@/lib/reports";
+import FollowListSheet from "./FollowListSheet";
 
 const PROFILE_PAGE_SIZE = 60;
+
+// The profile's own posts query doesn't join profiles (it's always the same
+// person), but PostCard reads post.profiles for the header, download
+// permission and lock status — so attach it here.
+function attachOwnerProfile(rows: Post[], owner: Profile): Post[] {
+  return rows.map((r) => ({
+    ...r,
+    profiles: {
+      username: owner.username,
+      avatar_url: owner.avatar_url,
+      is_verified: owner.is_verified,
+      disable_downloads: owner.disable_downloads,
+      is_locked: owner.is_locked,
+    },
+  }));
+}
 
 export default function ProfileView({ username: rawUsername }: { username: string }) {
   const username = rawUsername.trim();
@@ -48,6 +65,19 @@ export default function ProfileView({ username: rawUsername }: { username: strin
   const [reportingUser, setReportingUser] = useState(false);
   const [hasMorePosts, setHasMorePosts] = useState(false);
   const [loadingMorePosts, setLoadingMorePosts] = useState(false);
+  const [followListMode, setFollowListMode] = useState<"followers" | "following" | null>(null);
+  // 0 = at the top (full-size header), 1 = fully collapsed into the compact bar.
+  const [scrollProgress, setScrollProgress] = useState(0);
+
+  useEffect(() => {
+    const COLLAPSE_RANGE = 130;
+    function onScroll() {
+      setScrollProgress(Math.min(1, Math.max(0, window.scrollY / COLLAPSE_RANGE)));
+    }
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   useEffect(() => {
     load();
@@ -74,7 +104,7 @@ export default function ProfileView({ username: rawUsername }: { username: strin
       .order("created_at", { ascending: false })
       .order("position", { foreignTable: "post_media", ascending: true })
       .range(0, PROFILE_PAGE_SIZE - 1);
-    setPosts(postRows ?? []);
+    setPosts(attachOwnerProfile(postRows ?? [], p));
     setHasMorePosts((postRows ?? []).length === PROFILE_PAGE_SIZE);
 
     const [followerRes, followingRes, likesRes] = await Promise.all([
@@ -115,7 +145,7 @@ export default function ProfileView({ username: rawUsername }: { username: strin
       .range(posts.length, posts.length + PROFILE_PAGE_SIZE - 1);
     setPosts((prev) => {
       const known = new Set(prev.map((x) => x.id));
-      return [...prev, ...(more ?? []).filter((x) => !known.has(x.id))];
+      return [...prev, ...attachOwnerProfile(more ?? [], profile).filter((x) => !known.has(x.id))];
     });
     setHasMorePosts((more ?? []).length === PROFILE_PAGE_SIZE);
     setLoadingMorePosts(false);
@@ -152,7 +182,10 @@ export default function ProfileView({ username: rawUsername }: { username: strin
       const conversationId = await getOrCreateDirectConversation(profile.id);
       router.push(`/chat/${conversationId}`);
     } catch (err) {
-      setError(getErrorMessage(err));
+      const message = getErrorMessage(err);
+      // Raised by the database (enforce_conversation_join_rules) — already
+      // phrased for the reader, so show it as-is instead of a generic error.
+      setError(message.includes("only accepts messages") ? message : getErrorMessage(err));
     }
   }
 
@@ -179,13 +212,44 @@ export default function ProfileView({ username: rawUsername }: { username: strin
   }
 
   const header = (
-    <header className="safe-top sticky top-0 z-30 flex items-center gap-3 border-b border-black/5 bg-surface-lightMuted px-3 py-3 dark:border-white/5 dark:bg-surface-darkMuted">
-      <button onClick={() => router.back()} aria-label="Back">
+    <header
+      className={`safe-top sticky top-0 z-30 flex items-center gap-3 px-3 py-3 transition-colors duration-200 ${
+        scrollProgress > 0.05 ? "glass-header" : "border-b border-transparent"
+      }`}
+    >
+      <button onClick={() => router.back()} aria-label="Back" className="shrink-0">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
-      <h1 className="text-lg font-bold">Profile</h1>
+
+      {/* The big avatar below shrinks/fades as you scroll; this mini avatar
+          fades in at the same rate right where it "lands", so the profile
+          picture reads as one continuous liquid-glass motion into the header. */}
+      <div
+        className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-brand-gradient transition-transform"
+        style={{
+          opacity: scrollProgress,
+          transform: `scale(${0.6 + 0.4 * scrollProgress})`,
+        }}
+      >
+        {profile?.avatar_url && <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />}
+      </div>
+
+      <div className="relative min-w-0 flex-1">
+        <h1
+          className="absolute inset-0 flex items-center truncate text-lg font-bold transition-opacity"
+          style={{ opacity: 1 - scrollProgress }}
+        >
+          Profile
+        </h1>
+        <p
+          className="absolute inset-0 flex items-center truncate text-sm font-bold transition-opacity"
+          style={{ opacity: scrollProgress }}
+        >
+          {profile?.display_name || profile?.username}
+        </p>
+      </div>
     </header>
   );
 
@@ -206,10 +270,19 @@ export default function ProfileView({ username: rawUsername }: { username: strin
     );
   }
 
+  const isLockedForViewer = !!profile?.is_locked && !isSelf && relation !== "following";
+
   return (
     <div className="pb-8">
       {header}
-      <div className="flex flex-col items-center px-4 pt-6">
+      <div
+        className="flex flex-col items-center px-4 pt-6 transition-transform duration-100"
+        style={{
+          transform: `scale(${1 - 0.12 * scrollProgress})`,
+          opacity: 1 - 0.85 * scrollProgress,
+          transformOrigin: "top center",
+        }}
+      >
         {!isSelf && (
           <div className="relative mb-2 ml-auto mr-0 self-end">
             <button onClick={() => setMenuOpen((o) => !o)} className="p-1 text-ink-muted" aria-label="Profile options">
@@ -252,6 +325,11 @@ export default function ProfileView({ username: rawUsername }: { username: strin
         <h2 className="mt-3 flex items-center gap-1.5 text-lg font-bold">
           {profile.display_name ?? profile.username}
           {profile.is_verified && <VerifiedBadge size={16} />}
+          {profile.is_locked && (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-ink-muted" aria-label="Private account">
+              <rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 018 0v3" strokeLinecap="round" />
+            </svg>
+          )}
           {isSelf && (
             <button onClick={() => router.push("/profile/edit")} aria-label="Edit account" className="text-ink-muted">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -269,14 +347,14 @@ export default function ProfileView({ username: rawUsername }: { username: strin
         {profile.location && <p className="mt-1 text-xs text-ink-muted">📍 {profile.location}</p>}
 
         <div className="mt-4 flex items-center gap-6">
-          <div className="flex flex-col items-center">
+          <button onClick={() => setFollowListMode("followers")} className="flex flex-col items-center">
             <span className="text-base font-bold">{followerCount}</span>
             <span className="text-xs text-ink-muted">Fans</span>
-          </div>
-          <div className="flex flex-col items-center">
+          </button>
+          <button onClick={() => setFollowListMode("following")} className="flex flex-col items-center">
             <span className="text-base font-bold">{followingCount}</span>
             <span className="text-xs text-ink-muted">Following</span>
-          </div>
+          </button>
           <div className="flex flex-col items-center">
             <span className="text-base font-bold">{likeCount}</span>
             <span className="text-xs text-ink-muted">Likes</span>
@@ -310,7 +388,21 @@ export default function ProfileView({ username: rawUsername }: { username: strin
         {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
       </div>
 
-      {!blocked.blockedMe && (
+      {!blocked.blockedMe && isLockedForViewer && (
+        <div className="mt-10 flex flex-col items-center px-8 text-center">
+          <div className="grid h-14 w-14 place-items-center rounded-full bg-black/5 dark:bg-white/10">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="text-ink-muted">
+              <rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 018 0v3" strokeLinecap="round" />
+            </svg>
+          </div>
+          <p className="mt-3 text-sm font-bold">This account is private</p>
+          <p className="mt-1 text-sm text-ink-muted">
+            Follow @{profile.username} to see their posts and stories.
+          </p>
+        </div>
+      )}
+
+      {!blocked.blockedMe && !isLockedForViewer && (
         <>
           <div className="mt-6 grid grid-cols-3 gap-0.5 px-0.5">
             {posts.map((post) => (
@@ -361,6 +453,15 @@ export default function ProfileView({ username: rawUsername }: { username: strin
             />
           </div>
         </div>
+      )}
+
+      {followListMode && profile && (
+        <FollowListSheet
+          userId={profile.id}
+          mode={followListMode}
+          isSelf={isSelf}
+          onClose={() => setFollowListMode(null)}
+        />
       )}
 
       {reportingUser && profile && (

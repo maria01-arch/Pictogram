@@ -51,7 +51,7 @@ export default function HomeFeed() {
     );
     const { data, error } = await supabase
       .from("posts")
-      .select("*, profiles!posts_user_id_fkey(username, avatar_url, is_verified), post_media(*)")
+      .select("*, profiles!posts_user_id_fkey(username, avatar_url, is_verified, disable_downloads, is_locked), post_media(*)")
       .in("id", ids)
       .order("position", { foreignTable: "post_media", ascending: true });
 
