@@ -10,6 +10,7 @@ import ConfirmModal from "./ConfirmModal";
 import type { Comment, CommentReaction } from "@/types/database";
 import Portal from "./Portal";
 import { useScrollLock } from "@/lib/useScrollLock";
+import { useViewportHeight } from "@/lib/useViewportHeight";
 import { getUserLocal } from "@/lib/authUser";
 import { getBlockedUserIds } from "@/lib/block";
 import { submitReport } from "@/lib/reports";
@@ -28,6 +29,10 @@ export default function CommentsSheet({
   onClose: () => void;
   onCountChange?: (delta: number) => void;
 }) {
+  // Same fix as the chat composer: keeps the input above the on-screen
+  // keyboard instead of the keyboard covering it, including inside WebView
+  // wrappers where the plain `vh`/`dvh` units don't track the keyboard.
+  useViewportHeight();
   const [comments, setComments] = useState<Comment[]>([]);
   const [reactions, setReactions] = useState<CommentReaction[]>([]);
   const [draft, setDraft] = useState("");
@@ -135,9 +140,14 @@ export default function CommentsSheet({
 
   return (
     <Portal>
-    <div className="fixed inset-0 z-40 flex items-end bg-black/40" onClick={onClose}>
+    <div
+      className="fixed inset-x-0 z-40 flex items-end bg-black/40"
+      style={{ top: "var(--app-offset-top, 0px)", height: "var(--app-height, 100dvh)" }}
+      onClick={onClose}
+    >
       <div
-        className="max-h-[75vh] w-full rounded-t-2xl bg-surface-lightMuted dark:bg-surface-dark"
+        className="flex w-full flex-col rounded-t-2xl bg-surface-lightMuted dark:bg-surface-dark"
+        style={{ maxHeight: "calc(var(--app-height, 100dvh) * 0.85)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-black/5 px-4 py-3 dark:border-white/5">
@@ -145,7 +155,7 @@ export default function CommentsSheet({
           <button onClick={onClose} className="text-ink-muted">✕</button>
         </div>
 
-        <div className="max-h-[50vh] overflow-y-auto px-4 py-3 no-scrollbar">
+        <div className="flex-1 overflow-y-auto px-4 py-3 no-scrollbar">
           {loading && <p className="text-sm text-ink-muted">Loading…</p>}
           {!loading && comments.length === 0 && (
             <p className="py-6 text-center text-sm text-ink-muted">No comments yet. Say something!</p>

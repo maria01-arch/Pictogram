@@ -1,23 +1,21 @@
-// Best-effort file download. Same-origin-ish CORS is needed for the R2/Supabase
-// URLs we already use for post media, which serve public files with permissive
-// CORS, so this works for the images/videos this app creates. If a fetch is
-// blocked for any reason we fall back to just opening the file in a new tab.
-export async function downloadMedia(url: string, filename: string) {
-  try {
-    const res = await fetch(url, { mode: "cors" });
-    if (!res.ok) throw new Error("download failed");
-    const blob = await res.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = objectUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(objectUrl), 10_000);
-  } catch {
-    window.open(url, "_blank", "noopener,noreferrer");
-  }
+// Builds a same-origin download link. Actual byte streaming + the
+// Content-Disposition header that triggers a real OS-level download (instead
+// of the browser/WebView just opening the file as a page) happens in
+// app/api/download/route.ts — see that file for why this can't be a direct
+// client-side fetch of the R2/Supabase URL.
+export function buildDownloadUrl(mediaUrl: string, filename: string): string {
+  const params = new URLSearchParams({ url: mediaUrl, name: filename });
+  return `/api/download?${params.toString()}`;
+}
+
+export function downloadMedia(mediaUrl: string, filename: string) {
+  const a = document.createElement("a");
+  a.href = buildDownloadUrl(mediaUrl, filename);
+  a.download = filename; // ignored by browsers once Content-Disposition is set; harmless
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 
 export interface ShareTarget {

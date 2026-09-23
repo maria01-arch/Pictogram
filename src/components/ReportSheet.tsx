@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Portal from "./Portal";
 import { useScrollLock } from "@/lib/useScrollLock";
+import { useViewportHeight } from "@/lib/useViewportHeight";
 import { REPORT_CATEGORIES } from "@/lib/reports";
 import { getErrorMessage } from "@/lib/errorMessage";
 
@@ -18,6 +19,7 @@ export default function ReportSheet({
   onClose: () => void;
 }) {
   useScrollLock();
+  useViewportHeight();
   const [category, setCategory] = useState<string | null>(null);
   const [details, setDetails] = useState("");
   const [sending, setSending] = useState(false);
@@ -45,7 +47,8 @@ export default function ReportSheet({
   return (
     <Portal>
       <div
-        className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50"
+        className="fixed inset-x-0 z-[100] flex items-end justify-center bg-black/50"
+        style={{ top: "var(--app-offset-top, 0px)", height: "var(--app-height, 100dvh)" }}
         onClick={onClose}
         onPointerDown={stop}
         onPointerUp={stop}
@@ -53,7 +56,8 @@ export default function ReportSheet({
         onTouchEnd={stop}
       >
         <div
-          className="safe-bottom max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-t-2xl glass-card p-4"
+          className="safe-bottom w-full max-w-lg overflow-y-auto rounded-t-2xl glass-card p-4"
+          style={{ maxHeight: "calc(var(--app-height, 100dvh) * 0.85)" }}
           onClick={(e) => e.stopPropagation()}
         >
           {done ? (
