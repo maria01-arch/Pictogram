@@ -24,6 +24,8 @@ export interface Profile {
   disable_downloads?: boolean;
   hide_following_list?: boolean;
   is_locked?: boolean;
+  business_email?: string | null;
+  business_link?: string | null;
   created_at: string;
   updated_at: string;
 }

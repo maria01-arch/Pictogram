@@ -346,6 +346,29 @@ export default function ProfileView({ username: rawUsername }: { username: strin
         )}
         {profile.location && <p className="mt-1 text-xs text-ink-muted">📍 {profile.location}</p>}
 
+        {(profile.business_email || profile.business_link) && (
+          <div className="mt-2.5 flex flex-wrap items-center justify-center gap-2">
+            {profile.business_email && (
+              <a
+                href={`mailto:${profile.business_email}`}
+                className="rounded-full bg-black/5 px-3 py-1.5 text-xs font-semibold dark:bg-white/10"
+              >
+                ✉️ Email
+              </a>
+            )}
+            {profile.business_link && (
+              <a
+                href={profile.business_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="max-w-[200px] truncate rounded-full bg-black/5 px-3 py-1.5 text-xs font-semibold dark:bg-white/10"
+              >
+                🔗 {profile.business_link.replace(/^https?:\/\/(www\.)?/i, "").replace(/\/$/, "")}
+              </a>
+            )}
+          </div>
+        )}
+
         <div className="mt-4 flex items-center gap-6">
           <button onClick={() => setFollowListMode("followers")} className="flex flex-col items-center">
             <span className="text-base font-bold">{followerCount}</span>

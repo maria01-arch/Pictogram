@@ -18,6 +18,9 @@ import ConfirmModal from "./ConfirmModal";
 import ImageEditor from "./ImageEditor";
 import Portal from "./Portal";
 import VerifiedBadge from "./VerifiedBadge";
+import MessageSearchSheet from "./MessageSearchSheet";
+import LinkPreviewCard from "./LinkPreviewCard";
+import type { MessageSearchResult } from "@/lib/messageSearch";
 import EmojiText from "./EmojiText";
 import { useTopLoading } from "./TopLoadingBar";
 import { ChatSkeleton } from "./Skeleton";
@@ -111,6 +114,14 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
   const [messages, setMessages] = useState<Message[]>([]);
   const [hasOlder, setHasOlder] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
+  // Set once a search result is opened (the loaded window is centered on
+  // that message rather than the real latest messages) — lets "Jump to
+  // latest" know it needs to reload the true end of the conversation
+  // instead of just scrolling to the bottom of what's already in memory.
+  const [hasNewer, setHasNewer] = useState(false);
+  const [loadingNewer, setLoadingNewer] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [extraQuoted, setExtraQuoted] = useState<Record<string, Message>>({});
   const [sendError, setSendError] = useState<string | null>(null);
   const restoreScrollRef = useRef<{ height: number; top: number } | null>(null);
@@ -147,6 +158,8 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     setShowJumpToBottom(distanceFromBottom > JUMP_THRESHOLD_PX);
     if (el.scrollTop < 120 && hasOlder && !loadingOlder) loadOlder();
+    const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (distanceToBottom < 120 && hasNewer && !loadingNewer) loadNewer();
   }
 
   // Loads the next-older page of messages when you scroll to the top.
@@ -185,6 +198,83 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     setLoadingOlder(false);
   }
 
+  // Loads the next-newer page — only relevant after jumpToMessage has
+  // moved the visible window away from the real end of the conversation.
+  async function loadNewer() {
+    const newest = messages[messages.length - 1];
+    if (!newest || loadingNewer || !hasNewer) return;
+    setLoadingNewer(true);
+    const { data: rows } = await supabase
+      .from("messages")
+      .select("*")
+      .eq("conversation_id", conversationId)
+      .gt("created_at", newest.created_at)
+      .order("created_at", { ascending: true })
+      .limit(PAGE_SIZE);
+    const newer = (rows ?? []) as Message[];
+    if (newer.length > 0) {
+      setMessages((prev) => {
+        const known = new Set(prev.map((m) => m.id));
+        return [...prev, ...newer.filter((m) => !known.has(m.id))];
+      });
+      loadMissingQuoted(newer);
+    }
+    setHasNewer(newer.length === PAGE_SIZE);
+    setLoadingNewer(false);
+  }
+
+  // Re-fetches the real latest page — used by "Jump to latest" after a
+  // search jump, since bottomRef only points at whatever is currently
+  // loaded, which may not be the actual end of the conversation anymore.
+  async function reloadLatest() {
+    const { data: rows } = await supabase
+      .from("messages")
+      .select("*")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: false })
+      .limit(PAGE_SIZE);
+    const ordered = ((rows ?? []) as Message[]).slice().reverse();
+    setMessages(ordered);
+    setHasOlder((rows ?? []).length === PAGE_SIZE);
+    setHasNewer(false);
+    loadMissingQuoted(ordered);
+    requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }));
+  }
+
+  // Jumps to a message found via search: loads a window of messages
+  // centered on it (some before, some after), highlights it briefly, and
+  // scrolls it into view. Scrolling further up/down from there uses the
+  // normal loadOlder/loadNewer paging.
+  async function jumpToMessage(target: MessageSearchResult) {
+    setShowSearch(false);
+    const [{ data: before }, { data: after }] = await Promise.all([
+      supabase
+        .from("messages")
+        .select("*")
+        .eq("conversation_id", conversationId)
+        .lte("created_at", target.created_at)
+        .order("created_at", { ascending: false })
+        .limit(25),
+      supabase
+        .from("messages")
+        .select("*")
+        .eq("conversation_id", conversationId)
+        .gt("created_at", target.created_at)
+        .order("created_at", { ascending: true })
+        .limit(25),
+    ]);
+    const merged = [...((before ?? []) as Message[]).slice().reverse(), ...((after ?? []) as Message[])];
+    setMessages(merged);
+    setHasOlder((before ?? []).length === 25);
+    setHasNewer((after ?? []).length === 25);
+    loadMissingQuoted(merged);
+    setHighlightedId(target.id);
+    setTimeout(() => setHighlightedId((id) => (id === target.id ? null : id)), 2000);
+    requestAnimationFrame(() => {
+      document.getElementById(`msg-${target.id}`)?.scrollIntoView({ block: "center" });
+    });
+  }
+
   // A reply may quote a message that isn't in the loaded page — fetch just those.
   async function loadMissingQuoted(batch: Message[]) {
     const have = new Set(batch.map((m) => m.id));
@@ -202,7 +292,11 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     }
   }
   function jumpToBottom() {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (hasNewer) {
+      reloadLatest();
+    } else {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }
   const channelRef = useRef<RealtimeChannel | null>(null);
   const otherTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -720,7 +814,25 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
             </div>
           </Link>
         )}
+
+        <button
+          onClick={() => setShowSearch(true)}
+          aria-label="Search messages"
+          className="shrink-0 p-1.5"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" strokeLinecap="round" />
+          </svg>
+        </button>
       </header>
+
+      {showSearch && (
+        <MessageSearchSheet
+          conversationId={conversationId}
+          onSelect={jumpToMessage}
+          onClose={() => setShowSearch(false)}
+        />
+      )}
 
       {initialLoading ? (
         <ChatSkeleton />
@@ -776,7 +888,10 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
           return (
             <div
               key={m.id}
-              className={`flex flex-col ${mine ? "items-end" : "items-start"} ${groupedWithPrev ? "mt-0.5" : "mt-2"}`}
+              id={`msg-${m.id}`}
+              className={`flex flex-col rounded-2xl transition-colors duration-700 ${mine ? "items-end" : "items-start"} ${groupedWithPrev ? "mt-0.5" : "mt-2"} ${
+                highlightedId === m.id ? "bg-brand-from/15" : ""
+              }`}
               onTouchStart={handleRowTouchStart}
               onTouchMove={(e) => handleRowTouchMove(m, e)}
               onTouchEnd={() => handleRowTouchEnd(m)}
@@ -868,6 +983,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
                   {inlineMeta}
                 </div>
               )}
+              {!m.media_url && m.content && <LinkPreviewCard content={m.content} mine={mine} />}
               </div>
               </div>
 
