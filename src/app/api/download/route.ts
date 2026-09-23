@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { R2_PUBLIC_URL } from "@/lib/r2";
 
 export const maxDuration = 60;
@@ -32,21 +31,24 @@ function isAllowedMediaUrl(raw: string): boolean {
 // instead of fetching R2/Supabase directly from the browser, for two reasons:
 // 1) A JS "fetch → blob → <a download>" depends on the media host sending
 //    permissive CORS headers, which R2 doesn't for plain GETs.
-// 2) More importantly, inside the Android WebView this app is wrapped in,
-//    that blob/anchor trick is handled inconsistently — some file types get
-//    silently opened as a page instead of downloaded, and the in-app router
-//    doesn't recognize that navigation, so the back button reloads the
-//    whole app instead of returning to the feed.
+// 2) Inside the Android WebView this app is wrapped in, that blob/anchor
+//    trick was handled inconsistently per file type — images opened as a
+//    page instead of downloading, and the in-app router didn't recognize
+//    that navigation, so the back button reloaded the whole app.
 // A same-origin response with Content-Disposition: attachment is what
-// Android's WebView.setDownloadListener is actually built to catch, so this
-// hands off to the OS's normal download flow for every file type the same way.
+// Android's WebView.setDownloadListener is built to catch, handing off to
+// the OS's own DownloadManager.
+//
+// IMPORTANT: this route has NO login check, on purpose. DownloadManager
+// makes its own separate network request — it does not carry the WebView's
+// session cookie — so a route that required being signed in always failed
+// here with 401, which is exactly the "Download failed" notification this
+// fixes. That's not a new privacy hole: post and story media is already
+// fully public with no auth at its real R2/Supabase URL (that's how the
+// feed's plain <img>/<video> tags render it), so this route only ever
+// re-serves bytes anyone could already fetch directly. The allow-list above
+// keeps it from being used as a proxy for anything else.
 export async function GET(request: Request) {
-  const supabase = await createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
-  }
-
   const { searchParams } = new URL(request.url);
   const url = searchParams.get("url");
   const name = searchParams.get("name") || "download";

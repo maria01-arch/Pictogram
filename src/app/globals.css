@@ -22,7 +22,7 @@ html.dark {
 
   /* visible keyboard focus everywhere — accessibility floor */
   :focus-visible {
-    outline: 2px solid #17C3EC;
+    outline: 2px solid #1E4FD1;
     outline-offset: 2px;
   }
 }
