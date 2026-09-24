@@ -177,13 +177,23 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
                   isActive ? "text-brand-from" : "text-ink-muted"
                 }`}
               >
-                <span className="relative">
-                  <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.3 : 1.8}>
-                    <path d={item.icon} strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                <span className="relative flex items-center justify-center">
+                  {/* Soft blue shade behind the active icon. The plate below
+                      (same flat color as the nav bar) sits on top of it with
+                      a little padding, so there's a visible gap between the
+                      icon and the shade rather than the icon touching it. */}
+                  {isActive && <span className="absolute h-11 w-11 rounded-2xl bg-brand-from/15" />}
+                  <span
+                    className={`relative z-10 flex items-center justify-center ${
+                      isActive ? "rounded-xl bg-white p-1.5 dark:bg-black" : ""
+                    }`}
+                  >
+                    <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.6 : 2.2}>
+                      <path d={item.icon} strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
                   <Badge count={navCount} />
                 </span>
-                {isActive && <span className="absolute bottom-1 h-[3px] w-6 rounded-full bg-brand-gradient" />}
               </Link>
             );
           })}
@@ -196,14 +206,16 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
                 aria-label="Profile"
                 className="relative flex items-center justify-center px-5 py-3 transition active:scale-95"
               >
-                <span
-                  className={`block h-6 w-6 overflow-hidden rounded-full bg-brand-gradient ${
-                    isActive ? "ring-2 ring-brand-from ring-offset-1 ring-offset-surface-light dark:ring-offset-surface-dark" : ""
-                  }`}
-                >
-                  {ownProfile?.avatar_url && <img src={ownProfile.avatar_url} alt="" className="h-full w-full object-cover" />}
+                <span className="relative flex items-center justify-center">
+                  {isActive && <span className="absolute h-11 w-11 rounded-2xl bg-brand-from/15" />}
+                  <span
+                    className={`relative z-10 block h-6 w-6 overflow-hidden rounded-full bg-brand-gradient ${
+                      isActive ? "ring-2 ring-brand-from ring-offset-2 ring-offset-white dark:ring-offset-black" : ""
+                    }`}
+                  >
+                    {ownProfile?.avatar_url && <img src={ownProfile.avatar_url} alt="" className="h-full w-full object-cover" />}
+                  </span>
                 </span>
-                {isActive && <span className="absolute bottom-1 h-[3px] w-6 rounded-full bg-brand-gradient" />}
               </Link>
             );
           })()}

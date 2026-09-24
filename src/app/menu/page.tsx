@@ -159,7 +159,7 @@ export default function MenuPage() {
               <path d="M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <span className="flex-1 text-sm font-semibold">Switch account</span>
+          <span className="flex-1 text-[15px] font-bold">Switch account</span>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-ink-muted/60">
             <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -197,8 +197,8 @@ export default function MenuPage() {
                   </svg>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold">{item.label}</p>
-                  <p className="truncate text-xs text-ink-muted">{item.description}</p>
+                  <p className="text-[15px] font-bold">{item.label}</p>
+                  <p className="truncate text-xs font-medium text-ink-muted">{item.description}</p>
                 </div>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-ink-muted/60">
                   <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
@@ -211,7 +211,7 @@ export default function MenuPage() {
 
       <button
         onClick={handleLogout}
-        className="mt-6 w-full rounded-xl2 border border-red-500/20 bg-red-500/[0.06] py-3 text-sm font-semibold text-red-500 transition active:bg-red-500/10"
+        className="mt-6 w-full rounded-xl2 border border-red-500/20 bg-red-500/[0.06] py-3 text-[15px] font-bold text-red-500 transition active:bg-red-500/10"
       >
         Log out
       </button>

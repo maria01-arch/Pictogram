@@ -19,6 +19,16 @@ export interface MessageSearchOptions {
   dateTo?: string;
 }
 
+// `%` and `_` are wildcards inside a LIKE/ILIKE pattern — `_` in particular
+// means "any single character", so an unescaped search for e.g. "my_post"
+// would also match "myXpost", "my.post", etc. That's what made results feel
+// "inaccurate": a keyword with an underscore (common in usernames/handles)
+// matched far more than the literal text typed. Escaping the user's text
+// before wrapping it in our own %...% wildcards fixes that.
+function escapeLikePattern(raw: string): string {
+  return raw.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
 export async function searchMessages(
   conversationId: string,
   opts: MessageSearchOptions
@@ -27,15 +37,14 @@ export async function searchMessages(
     .from("messages")
     .select("id, content, media_url, created_at, sender_id")
     .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: false })
-    .limit(100);
+    // Ascending, so search results and the up/down "find next" navigation
+    // move through the conversation in reading order.
+    .order("created_at", { ascending: true })
+    .limit(200);
 
   const keyword = opts.keyword?.trim();
   if (keyword) {
-    // A single-column filter, so — unlike an .or() filter string built from
-    // several columns — special characters in the search term can't break
-    // the query the way they could in SearchView's combined search.
-    query = query.ilike("content", `%${keyword}%`);
+    query = query.ilike("content", `%${escapeLikePattern(keyword)}%`);
   }
   if (opts.mediaType === "text") {
     query = query.is("media_url", null);

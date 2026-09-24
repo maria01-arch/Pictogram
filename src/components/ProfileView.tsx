@@ -363,7 +363,9 @@ export default function ProfileView({ username: rawUsername }: { username: strin
                 rel="noopener noreferrer"
                 className="max-w-[200px] truncate rounded-full bg-black/5 px-3 py-1.5 text-xs font-semibold dark:bg-white/10"
               >
-                🔗 {profile.business_link.replace(/^https?:\/\/(www\.)?/i, "").replace(/\/$/, "")}
+                {profile.business_link_type === "mylinks"
+                  ? "🔗 My Links"
+                  : `🌐 ${profile.business_link.replace(/^https?:\/\/(www\.)?/i, "").replace(/\/$/, "")}`}
               </a>
             )}
           </div>

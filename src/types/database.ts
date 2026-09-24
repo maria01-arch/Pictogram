@@ -26,6 +26,7 @@ export interface Profile {
   is_locked?: boolean;
   business_email?: string | null;
   business_link?: string | null;
+  business_link_type?: "website" | "mylinks";
   created_at: string;
   updated_at: string;
 }

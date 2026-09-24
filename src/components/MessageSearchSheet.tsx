@@ -33,7 +33,9 @@ export default function MessageSearchSheet({
   onClose,
 }: {
   conversationId: string;
-  onSelect: (message: MessageSearchResult) => void;
+  // Passes the whole match list plus which one was tapped, so the chat view
+  // can offer "next/previous match" navigation without re-running the search.
+  onSelect: (results: MessageSearchResult[], index: number) => void;
   onClose: () => void;
 }) {
   useScrollLock();
@@ -157,10 +159,16 @@ export default function MessageSearchSheet({
             <p className="px-4 py-10 text-center text-sm text-ink-muted">No messages match.</p>
           )}
 
-          {!loading && results?.map((m) => (
+          {!loading && results !== null && results.length > 0 && (
+            <p className="px-3 pb-1 pt-0.5 text-xs text-ink-muted">
+              {results.length} {results.length === 1 ? "match" : "matches"}
+            </p>
+          )}
+
+          {!loading && results?.map((m, i) => (
             <button
               key={m.id}
-              onClick={() => onSelect(m)}
+              onClick={() => results && onSelect(results, i)}
               className="flex w-full flex-col gap-0.5 rounded-xl2 px-3 py-2.5 text-left transition active:bg-black/5 dark:active:bg-white/5"
             >
               <p className="truncate text-sm">{snippetFor(m)}</p>

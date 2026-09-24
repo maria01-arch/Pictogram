@@ -40,6 +40,30 @@ function formatBubbleTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
+function startOfDay(d: Date): number {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+function isSameDay(a: string, b: string): boolean {
+  return startOfDay(new Date(a)) === startOfDay(new Date(b));
+}
+
+// A relative divider like WhatsApp/Telegram's "Today"/"Yesterday", extended
+// further out ("A week ago", "A month ago"...) the way the person asked for,
+// falling back to an actual month/year once it's old enough that "N months
+// ago" stops being a useful way to place it in time.
+function formatDateSeparator(iso: string): string {
+  const diffDays = Math.round((startOfDay(new Date()) - startOfDay(new Date(iso))) / 86_400_000);
+  if (diffDays <= 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 14) return "A week ago";
+  if (diffDays < 30) return `${Math.round(diffDays / 7)} weeks ago`;
+  if (diffDays < 60) return "A month ago";
+  if (diffDays < 365) return `${Math.round(diffDays / 30)} months ago`;
+  return new Date(iso).toLocaleDateString([], { month: "long", year: "numeric" });
+}
+
 function Ticks({ seen, light }: { seen: boolean; light?: boolean }) {
   return (
     <svg width="13" height="9" viewBox="0 0 16 10" fill="none" className={seen ? "text-brand-from" : light ? "text-white/80" : "text-ink-muted"}>
@@ -122,6 +146,28 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
   const [loadingNewer, setLoadingNewer] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  // Active "find in conversation" session (set once a search sheet result is
+  // tapped). While this is non-null, the current match's bubble stays
+  // highlighted — no auto-fade — and the nav bar's up/down arrows step
+  // through the rest of the matches.
+  const [searchResults, setSearchResults] = useState<MessageSearchResult[] | null>(null);
+  const [searchIndex, setSearchIndex] = useState<number | null>(null);
+  // Single-emoji bubbles: the timestamp is hidden by default and only shows
+  // when tapped (tapping again hides it), with a little bounce on the emoji
+  // itself as feedback for the tap.
+  const [revealedTimeIds, setRevealedTimeIds] = useState<Set<string>>(new Set());
+  const [bouncingId, setBouncingId] = useState<string | null>(null);
+
+  function handleEmojiTap(id: string) {
+    setRevealedTimeIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    setBouncingId(id);
+    setTimeout(() => setBouncingId((current) => (current === id ? null : current)), 420);
+  }
   const [extraQuoted, setExtraQuoted] = useState<Record<string, Message>>({});
   const [sendError, setSendError] = useState<string | null>(null);
   const restoreScrollRef = useRef<{ height: number; top: number } | null>(null);
@@ -246,7 +292,6 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
   // scrolls it into view. Scrolling further up/down from there uses the
   // normal loadOlder/loadNewer paging.
   async function jumpToMessage(target: MessageSearchResult) {
-    setShowSearch(false);
     const [{ data: before }, { data: after }] = await Promise.all([
       supabase
         .from("messages")
@@ -269,10 +314,29 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     setHasNewer((after ?? []).length === 25);
     loadMissingQuoted(merged);
     setHighlightedId(target.id);
-    setTimeout(() => setHighlightedId((id) => (id === target.id ? null : id)), 2000);
     requestAnimationFrame(() => {
       document.getElementById(`msg-${target.id}`)?.scrollIntoView({ block: "center" });
     });
+  }
+
+  function handleSearchPick(results: MessageSearchResult[], index: number) {
+    setShowSearch(false);
+    setSearchResults(results);
+    setSearchIndex(index);
+    jumpToMessage(results[index]);
+  }
+
+  function goToMatch(nextIndex: number) {
+    if (!searchResults || searchResults.length === 0) return;
+    const wrapped = ((nextIndex % searchResults.length) + searchResults.length) % searchResults.length;
+    setSearchIndex(wrapped);
+    jumpToMessage(searchResults[wrapped]);
+  }
+
+  function clearSearchNav() {
+    setSearchResults(null);
+    setSearchIndex(null);
+    setHighlightedId(null);
   }
 
   // A reply may quote a message that isn't in the loaded page — fetch just those.
@@ -829,9 +893,26 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
       {showSearch && (
         <MessageSearchSheet
           conversationId={conversationId}
-          onSelect={jumpToMessage}
+          onSelect={handleSearchPick}
           onClose={() => setShowSearch(false)}
         />
+      )}
+
+      {searchResults && searchIndex !== null && (
+        <div className="flex shrink-0 items-center gap-1 border-b border-black/8 bg-white px-3 py-1.5 dark:border-white/10 dark:bg-black">
+          <button onClick={() => goToMatch(searchIndex - 1)} aria-label="Previous match" className="rounded-full p-1.5 active:bg-black/5 dark:active:bg-white/10">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M18 15l-6-6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </button>
+          <button onClick={() => goToMatch(searchIndex + 1)} aria-label="Next match" className="rounded-full p-1.5 active:bg-black/5 dark:active:bg-white/10">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </button>
+          <span className="flex-1 text-center text-xs font-semibold text-ink-muted">
+            {searchIndex + 1} of {searchResults.length}
+          </span>
+          <button onClick={clearSearchNav} aria-label="Close search" className="rounded-full p-1.5 active:bg-black/5 dark:active:bg-white/10">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" /></svg>
+          </button>
+        </div>
       )}
 
       {initialLoading ? (
@@ -864,6 +945,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
           const prev = messages[i - 1];
           const groupedWithPrev =
             !!prev && prev.sender_id === m.sender_id && new Date(m.created_at).getTime() - new Date(prev.created_at).getTime() < GROUP_GAP_MS;
+          const isNewDay = !prev || !isSameDay(prev.created_at, m.created_at);
 
           const timeLabel = formatBubbleTime(m.created_at);
           // Inline meta (time + ticks) rendered *inside* text/caption content
@@ -886,8 +968,15 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
           );
 
           return (
+            <div key={m.id}>
+            {isNewDay && (
+              <div className="my-3 flex justify-center">
+                <span className="rounded-full bg-black/5 px-3 py-1 text-[11px] font-semibold text-ink-muted dark:bg-white/10">
+                  {formatDateSeparator(m.created_at)}
+                </span>
+              </div>
+            )}
             <div
-              key={m.id}
               id={`msg-${m.id}`}
               className={`flex flex-col rounded-2xl transition-colors duration-700 ${mine ? "items-end" : "items-start"} ${groupedWithPrev ? "mt-0.5" : "mt-2"} ${
                 highlightedId === m.id ? "bg-brand-from/15" : ""
@@ -954,14 +1043,17 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
                 </div>
               ) : m.content && isSingleEmoji(m.content) && !quote ? (
                 <div
+                  onClick={() => handleEmojiTap(m.id)}
                   onTouchStart={(e) => startLongPress(m, e.touches[0].clientX, e.touches[0].clientY)}
                   onTouchEnd={cancelLongPress}
                   onTouchMove={cancelLongPress}
                   onContextMenu={(e) => { e.preventDefault(); setMenu({ message: m, x: e.clientX, y: e.clientY }); }}
                   className="relative select-none px-1 py-1"
                 >
-                  <EmojiText text={m.content} size={44} />
-                  {overlayMeta}
+                  <span className={`inline-block ${bouncingId === m.id ? "emoji-bounce" : ""}`}>
+                    <EmojiText text={m.content} size={44} />
+                  </span>
+                  {revealedTimeIds.has(m.id) && overlayMeta}
                 </div>
               ) : (
                 <div
@@ -996,6 +1088,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
                   ))}
                 </div>
               )}
+            </div>
             </div>
           );
         })}

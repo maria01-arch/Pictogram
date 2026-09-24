@@ -18,11 +18,11 @@ const config: Config = {
         surface: {
           light: "#FFFFFF",
           lightMuted: "#F7F9FC",
-          // True black for the main dark-mode background; elevated surfaces
-          // (cards, header, bottom nav — see glass-card/glass-header/glass-nav
-          // in globals.css) use the lighter darkMuted-adjacent value below so
-          // they visibly stand out instead of blending into pure black.
-          dark: "#12131C",
+          // Flat black theme: page and elevated surfaces (cards, header, nav)
+          // are the same true black — depth comes from hairline borders now
+          // (see .glass-card/.glass-header/.glass-nav in globals.css), not
+          // from a lighter card background.
+          dark: "#000000",
           darkMuted: "#000000",
         },
         ink: {

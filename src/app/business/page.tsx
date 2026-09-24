@@ -25,6 +25,7 @@ function BusinessProfileCard() {
   const [userId, setUserId] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [link, setLink] = useState("");
+  const [linkType, setLinkType] = useState<"website" | "mylinks">("website");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -37,11 +38,12 @@ function BusinessProfileCard() {
       setUserId(user.id);
       const { data } = await supabase
         .from("profiles")
-        .select("business_email, business_link")
+        .select("business_email, business_link, business_link_type")
         .eq("id", user.id)
         .single();
       setEmail(data?.business_email ?? "");
       setLink(data?.business_link ?? "");
+      setLinkType((data?.business_link_type as "website" | "mylinks") ?? "website");
       setLoading(false);
     }
     load();
@@ -63,6 +65,7 @@ function BusinessProfileCard() {
       .update({
         business_email: trimmedEmail || null,
         business_link: normalizedLink || null,
+        business_link_type: linkType,
       })
       .eq("id", userId);
     setSaving(false);
@@ -103,6 +106,33 @@ function BusinessProfileCard() {
         placeholder="yourwebsite.com"
         className="mt-1.5 w-full rounded-xl2 bg-black/5 px-3.5 py-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-from dark:bg-white/10"
       />
+
+      <label className="mt-3 block text-xs font-medium text-ink-muted">Show it as</label>
+      <div className="mt-1.5 flex gap-2 rounded-full bg-black/5 p-1 dark:bg-white/10">
+        <button
+          type="button"
+          onClick={() => setLinkType("website")}
+          className={`flex-1 rounded-full py-1.5 text-xs font-semibold transition ${
+            linkType === "website" ? "bg-brand-gradient text-white" : "text-ink-muted"
+          }`}
+        >
+          🌐 Website
+        </button>
+        <button
+          type="button"
+          onClick={() => setLinkType("mylinks")}
+          className={`flex-1 rounded-full py-1.5 text-xs font-semibold transition ${
+            linkType === "mylinks" ? "bg-brand-gradient text-white" : "text-ink-muted"
+          }`}
+        >
+          🔗 My Links
+        </button>
+      </div>
+      <p className="mt-1 text-[11px] text-ink-muted">
+        {linkType === "website"
+          ? "Shows your actual domain on your profile, e.g. \"yourbusiness.com\"."
+          : "Shows a generic \"My Links\" button instead of the raw web address — handy for link-in-bio pages."}
+      </p>
 
       {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
 
