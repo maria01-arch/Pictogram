@@ -34,15 +34,15 @@ html.dark {
      Class names kept as "glass-*" to avoid renaming ~100 call sites; they
      no longer render glass/blur, just a flat surface + border. */
   .glass-card {
-    @apply bg-white dark:bg-surface-dark border border-black/8 dark:border-white/10;
+    @apply bg-white dark:bg-surface-dark border border-black/[0.08] dark:border-white/10;
   }
 
   .glass-header {
-    @apply bg-white dark:bg-surface-dark border-b border-black/8 dark:border-white/10;
+    @apply bg-white dark:bg-surface-dark border-b border-black/[0.08] dark:border-white/10;
   }
 
   .glass-nav {
-    @apply bg-white dark:bg-surface-dark border-t border-black/8 dark:border-white/10;
+    @apply bg-white dark:bg-surface-dark border-t border-black/[0.08] dark:border-white/10;
   }
 
   /* For the transparent-status-bar webtoapp wrapper: pads content below

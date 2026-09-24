@@ -899,7 +899,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
       )}
 
       {searchResults && searchIndex !== null && (
-        <div className="flex shrink-0 items-center gap-1 border-b border-black/8 bg-white px-3 py-1.5 dark:border-white/10 dark:bg-black">
+        <div className="flex shrink-0 items-center gap-1 border-b border-black/[0.08] bg-white px-3 py-1.5 dark:border-white/10 dark:bg-black">
           <button onClick={() => goToMatch(searchIndex - 1)} aria-label="Previous match" className="rounded-full p-1.5 active:bg-black/5 dark:active:bg-white/10">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M18 15l-6-6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
