@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { uploadPost, uploadStory, uploadCarouselPost, type UploadStage } from "@/lib/uploadMedia";
 import { uploadTextPost, uploadTextStory, wordCount, MIN_TEXT_POST_WORDS } from "@/lib/uploadText";
 import { getErrorMessage } from "@/lib/errorMessage";
+import { getMyVideoLimitSeconds } from "@/lib/videoLimits";
 import PostMediaEditor, { type MediaEditorResult } from "./PostMediaEditor";
 import AiCaptionHelper from "./AiCaptionHelper";
 
@@ -27,6 +28,10 @@ export default function CreatePostForm() {
   const [textBody, setTextBody] = useState("");
   const [stage, setStage] = useState<UploadStage | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Verified accounts get longer feed clips — see lib/videoLimits.ts. Fetched
+  // once up front so it's ready the moment someone picks a video, instead of
+  // showing a wrong number for a moment first.
+  const [videoLimitSeconds, setVideoLimitSeconds] = useState<number | null>(null);
 
   // Single image/video posts (not stories, not carousels) get a crop/aspect
   // editing step between picking the file and writing a caption.
@@ -38,6 +43,10 @@ export default function CreatePostForm() {
       previewUrls.forEach((url) => URL.revokeObjectURL(url));
     };
   }, [previewUrls]);
+
+  useEffect(() => {
+    getMyVideoLimitSeconds("feed").then(setVideoLimitSeconds);
+  }, []);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(e.target.files ?? []);
@@ -88,9 +97,15 @@ export default function CreatePostForm() {
       if (mode === "post" && files.length > 1) {
         await uploadCarouselPost({ files, caption, onProgress: setStage });
       } else if (mode === "post") {
-        await uploadPost({ file: files[0], caption, edit: editResult ?? undefined, onProgress: setStage });
+        await uploadPost({
+          file: files[0],
+          caption,
+          edit: editResult ?? undefined,
+          onProgress: setStage,
+          maxVideoDurationSeconds: videoLimitSeconds ?? undefined,
+        });
       } else {
-        await uploadStory({ file: files[0], onProgress: setStage });
+        await uploadStory({ file: files[0], onProgress: setStage, maxVideoDurationSeconds: videoLimitSeconds ?? undefined });
       }
       router.push("/");
     } catch (err) {
@@ -206,6 +221,13 @@ export default function CreatePostForm() {
               >
                 Change
               </button>
+              {isVideo && videoLimitSeconds !== null && (
+                <span className="absolute bottom-2 left-2 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-semibold text-white">
+                  {videoLimitSeconds < 60
+                    ? `Trimmed to ${videoLimitSeconds}s — get verified for up to 60s`
+                    : "Up to 60s"}
+                </span>
+              )}
               {mode === "post" && (
                 <button
                   onClick={() => setShowEditor(true)}

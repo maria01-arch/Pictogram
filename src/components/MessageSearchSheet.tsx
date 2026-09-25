@@ -5,18 +5,21 @@ import Portal from "./Portal";
 import { useScrollLock } from "@/lib/useScrollLock";
 import { useViewportHeight } from "@/lib/useViewportHeight";
 import { isVoiceNotePath } from "@/lib/uploadChatVoice";
+import { isChatVideoPath } from "@/lib/uploadChatVideo";
 import { searchMessages, type MessageMediaFilter, type MessageSearchResult } from "@/lib/messageSearch";
 
 const MEDIA_FILTERS: { key: MessageMediaFilter; label: string }[] = [
   { key: "all", label: "All" },
   { key: "text", label: "Text" },
   { key: "photo", label: "Photos" },
+  { key: "video", label: "Videos" },
   { key: "voice", label: "Voice" },
 ];
 
 function snippetFor(m: MessageSearchResult): string {
   if (m.content) return m.content;
   if (m.media_url && isVoiceNotePath(m.media_url)) return "🎤 Voice message";
+  if (m.media_url && isChatVideoPath(m.media_url)) return "📹 Video";
   if (m.media_url) return "📷 Photo";
   return "";
 }

@@ -1,7 +1,8 @@
 import { supabase } from "./supabaseClient";
 import { isVoiceNotePath } from "./uploadChatVoice";
+import { isChatVideoPath } from "./uploadChatVideo";
 
-export type MessageMediaFilter = "all" | "text" | "photo" | "voice";
+export type MessageMediaFilter = "all" | "text" | "photo" | "video" | "voice";
 
 export interface MessageSearchResult {
   id: string;
@@ -48,7 +49,7 @@ export async function searchMessages(
   }
   if (opts.mediaType === "text") {
     query = query.is("media_url", null);
-  } else if (opts.mediaType === "photo" || opts.mediaType === "voice") {
+  } else if (opts.mediaType === "photo" || opts.mediaType === "video" || opts.mediaType === "voice") {
     query = query.not("media_url", "is", null);
   }
   if (opts.dateFrom) query = query.gte("created_at", `${opts.dateFrom}T00:00:00.000Z`);
@@ -58,9 +59,13 @@ export async function searchMessages(
   if (error) throw error;
   let rows = (data ?? []) as MessageSearchResult[];
 
-  // Photo vs. voice both just mean "has media_url" at the database level —
-  // the actual distinction only exists client-side (see isVoiceNotePath).
-  if (opts.mediaType === "photo") rows = rows.filter((m) => m.media_url && !isVoiceNotePath(m.media_url));
+  // Photo/video/voice all just mean "has media_url" at the database level —
+  // the actual distinction only exists client-side (see isVoiceNotePath /
+  // isChatVideoPath).
+  if (opts.mediaType === "photo") {
+    rows = rows.filter((m) => m.media_url && !isVoiceNotePath(m.media_url) && !isChatVideoPath(m.media_url));
+  }
+  if (opts.mediaType === "video") rows = rows.filter((m) => m.media_url && isChatVideoPath(m.media_url));
   if (opts.mediaType === "voice") rows = rows.filter((m) => m.media_url && isVoiceNotePath(m.media_url));
 
   return rows;

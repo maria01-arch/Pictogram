@@ -45,14 +45,14 @@ function getVideoDimensions(file: File): Promise<{ width: number; height: number
   });
 }
 
-async function processMedia(file: File, edit?: MediaEditorResult) {
+async function processMedia(file: File, edit?: MediaEditorResult, maxVideoDurationSeconds?: number) {
   const isVideo = file.type.startsWith("video/");
   const mediaType: MediaType = isVideo ? "video" : "image";
 
   if (!edit) {
     // Stories: full media, no feed-frame/cover cropping applied.
     if (isVideo) {
-      const compressed = await compressVideo(file);
+      const compressed = await compressVideo(file, undefined, maxVideoDurationSeconds);
       const thumbnailBlob = await extractThumbnail(file);
       return { mediaFile: compressed.file, thumbnailBlob, width: compressed.width, height: compressed.height, mediaType };
     }
@@ -78,7 +78,7 @@ async function processMedia(file: File, edit?: MediaEditorResult) {
   if (isVideo) {
     const nativeDims = await getVideoDimensions(file);
     const frameCrop = computeCropRect(nativeDims.width, nativeDims.height, targetAspect, edit.focalX, edit.focalY);
-    const compressed = await compressVideo(file, frameCrop);
+    const compressed = await compressVideo(file, frameCrop, maxVideoDurationSeconds);
 
     let thumbnailBlob: Blob;
     if (edit.customCoverFile) {
@@ -132,17 +132,21 @@ export async function uploadPost({
   caption,
   edit,
   onProgress,
+  maxVideoDurationSeconds,
 }: {
   file: File;
   caption: string;
   edit?: MediaEditorResult;
   onProgress?: (stage: UploadStage) => void;
+  // Verified vs unverified feed video cap — see lib/videoLimits.ts. Ignored
+  // for photo posts.
+  maxVideoDurationSeconds?: number;
 }) {
   const { data: { user } } = await getUserLocal();
   if (!user) throw new Error("You must be signed in to post.");
 
   onProgress?.("compressing");
-  const { mediaFile, thumbnailBlob, width, height, mediaType } = await processMedia(file, edit);
+  const { mediaFile, thumbnailBlob, width, height, mediaType } = await processMedia(file, edit, maxVideoDurationSeconds);
 
   onProgress?.("uploading");
   const { mediaUrl, thumbnailUrl } = await uploadToBucket("posts", mediaFile, thumbnailBlob);
@@ -173,15 +177,17 @@ export async function uploadPost({
 export async function uploadStory({
   file,
   onProgress,
+  maxVideoDurationSeconds,
 }: {
   file: File;
   onProgress?: (stage: UploadStage) => void;
+  maxVideoDurationSeconds?: number;
 }) {
   const { data: { user } } = await getUserLocal();
   if (!user) throw new Error("You must be signed in to post a story.");
 
   onProgress?.("compressing");
-  const { mediaFile, thumbnailBlob, mediaType } = await processMedia(file);
+  const { mediaFile, thumbnailBlob, mediaType } = await processMedia(file, undefined, maxVideoDurationSeconds);
 
   onProgress?.("uploading");
   const { mediaUrl, thumbnailUrl } = await uploadToBucket("stories", mediaFile, thumbnailBlob);

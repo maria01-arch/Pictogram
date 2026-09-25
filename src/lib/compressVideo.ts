@@ -19,7 +19,7 @@
  */
 
 const MAX_WIDTH = 720;
-const MAX_DURATION_SECONDS = 60;
+const DEFAULT_MAX_DURATION_SECONDS = 60;
 const TARGET_BITRATE = 1_500_000; // 1.5 Mbps — plenty for mobile feed video
 
 export interface CompressedVideoResult {
@@ -52,7 +52,15 @@ function pickMimeType(): string {
   throw new Error("No supported video recording format on this device");
 }
 
-export async function compressVideo(input: File, crop?: CropRect): Promise<CompressedVideoResult> {
+export async function compressVideo(
+  input: File,
+  crop?: CropRect,
+  // Verified accounts get longer clips than unverified ones, and the cap
+  // differs between the feed and DMs — see lib/videoLimits.ts, which is what
+  // every real call site passes here. The 60s default only matters if some
+  // future caller forgets to pass one explicitly.
+  maxDurationSeconds: number = DEFAULT_MAX_DURATION_SECONDS
+): Promise<CompressedVideoResult> {
   const sourceUrl = URL.createObjectURL(input);
   const video = document.createElement("video");
   video.src = sourceUrl;
@@ -64,7 +72,7 @@ export async function compressVideo(input: File, crop?: CropRect): Promise<Compr
     video.onerror = () => reject(new Error("Could not read video metadata"));
   });
 
-  const duration = Math.min(video.duration, MAX_DURATION_SECONDS);
+  const duration = Math.min(video.duration, maxDurationSeconds);
 
   const sourceX = crop ? crop.x * video.videoWidth : 0;
   const sourceY = crop ? crop.y * video.videoHeight : 0;

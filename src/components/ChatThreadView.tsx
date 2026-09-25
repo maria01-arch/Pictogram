@@ -11,6 +11,9 @@ import { markConversationRead } from "@/lib/badgeCounts";
 import { isOnline } from "@/lib/presence";
 import { AI_BOT_USERNAME } from "@/lib/aiBot";
 import { uploadChatImage, resolveChatMediaUrl } from "../lib/uploadChatImage";
+import { uploadChatVideo, isChatVideoPath } from "@/lib/uploadChatVideo";
+import { getMyVideoLimitSeconds } from "@/lib/videoLimits";
+import VideoPreview from "./VideoPreview";
 import { uploadChatVoice, isVoiceNotePath } from "@/lib/uploadChatVoice";
 import VoiceRecordBar from "./VoiceRecordBar";
 import ChatVoiceNote from "./ChatVoiceNote";
@@ -124,6 +127,56 @@ function ChatImage({ path, onTap }: { path: string; onTap: (url: string) => void
   );
 }
 
+// Same private-bucket signed-URL pattern as ChatImage, but resolves both the
+// video and its thumbnail (used as the poster frame before playback starts).
+function ChatVideo({ path, thumbnailPath }: { path: string; thumbnailPath: string | null }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [poster, setPoster] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setUrl(null);
+    setFailed(false);
+    resolveChatMediaUrl(path).then((resolved) => {
+      if (cancelled) return;
+      if (resolved) setUrl(resolved);
+      else setFailed(true);
+    });
+    if (thumbnailPath) {
+      resolveChatMediaUrl(thumbnailPath).then((resolved) => {
+        if (!cancelled && resolved) setPoster(resolved);
+      });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [path, thumbnailPath]);
+
+  if (failed) {
+    return (
+      <div className="flex h-24 w-48 items-center justify-center rounded-2xl bg-black/5 text-xs text-ink-muted dark:bg-white/10">
+        Video unavailable
+      </div>
+    );
+  }
+
+  if (!url) {
+    return <div className="h-40 w-48 animate-pulse rounded-2xl bg-black/5 dark:bg-white/10" />;
+  }
+
+  return (
+    <video
+      src={url}
+      poster={poster ?? undefined}
+      controls
+      playsInline
+      preload="metadata"
+      className="max-h-64 w-full select-none object-cover"
+    />
+  );
+}
+
 export default function ChatThreadView({ conversationId }: { conversationId: string }) {
   useViewportHeight();
   const router = useRouter();
@@ -189,6 +242,15 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [editingImageFile, setEditingImageFile] = useState<File | null>(null);
+  const [editingVideoFile, setEditingVideoFile] = useState<File | null>(null);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  // Verified accounts get a full minute in DMs; unverified get 25s — see
+  // lib/videoLimits.ts. Fetched once so it's ready the moment a video is picked.
+  const [videoLimitSeconds, setVideoLimitSeconds] = useState(25);
+
+  useEffect(() => {
+    getMyVideoLimitSeconds("dm").then(setVideoLimitSeconds);
+  }, []);
   const [recordingVoice, setRecordingVoice] = useState(false);
   const [uploadingVoice, setUploadingVoice] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
@@ -586,6 +648,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
       sender_id: userId,
       content,
       media_url: null,
+      thumbnail_url: null,
       reply_to_id: replyToId,
       edited_at: null,
       created_at: new Date().toISOString(),
@@ -649,6 +712,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
           sender_id: otherProfile?.id ?? "",
           content: "Couldn't reach the AI right now — check your connection and try again.",
           media_url: null,
+          thumbnail_url: null,
           reply_to_id: null,
           edited_at: null,
           created_at: new Date().toISOString(),
@@ -659,11 +723,15 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     }
   }
 
-  function handleImageSelected(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleMediaSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     setAttachMenuOpen(false);
     if (!file || !userId) return;
-    setEditingImageFile(file);
+    if (file.type.startsWith("video/")) {
+      setEditingVideoFile(file);
+    } else {
+      setEditingImageFile(file);
+    }
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
@@ -690,6 +758,33 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
       alert("Failed to send image. Try again.");
     } finally {
       setUploadingImage(false);
+    }
+  }
+
+  async function sendEditedVideo({ file, caption }: { file: File; caption: string }) {
+    setEditingVideoFile(null);
+    if (!userId) return;
+
+    setUploadingVideo(true);
+    try {
+      const { path, thumbnailPath } = await uploadChatVideo(file, videoLimitSeconds);
+      const { data, error } = await supabase
+        .from("messages")
+        .insert({
+          conversation_id: conversationId,
+          sender_id: userId,
+          content: caption || null,
+          media_url: path,
+          thumbnail_url: thumbnailPath,
+        })
+        .select("*")
+        .single();
+      if (error) throw error;
+      setMessages((prev) => (prev.some((m) => m.id === data.id) ? prev : [...prev, data]));
+    } catch {
+      alert("Failed to send video. Try again.");
+    } finally {
+      setUploadingVideo(false);
     }
   }
 
@@ -832,6 +927,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
     if (!m) return "";
     if (m.content) return m.content;
     if (m.media_url && isVoiceNotePath(m.media_url)) return "🎤 Voice message";
+    if (m.media_url && isChatVideoPath(m.media_url)) return "📹 Video";
     if (m.media_url) return "📷 Photo";
     return "";
   }
@@ -1019,6 +1115,28 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
                     }
                   />
                 </div>
+              ) : m.media_url && isChatVideoPath(m.media_url) ? (
+                <div
+                  onTouchStart={(e) => startLongPress(m, e.touches[0].clientX, e.touches[0].clientY)}
+                  onTouchEnd={cancelLongPress}
+                  onTouchMove={cancelLongPress}
+                  onContextMenu={(e) => { e.preventDefault(); setMenu({ message: m, x: e.clientX, y: e.clientY }); }}
+                  className="relative max-w-[65%] overflow-hidden rounded-2xl border border-black/10 dark:border-white/15"
+                >
+                  <ChatVideo path={m.media_url} thumbnailPath={m.thumbnail_url} />
+                  {m.content ? (
+                    <p
+                      className={`whitespace-pre-wrap break-words px-3 py-2 text-[15px] leading-snug ${
+                        mine ? "bg-brand-gradient text-white" : "bg-black/5 dark:bg-white/10"
+                      }`}
+                    >
+                      {m.content}
+                      {inlineMeta}
+                    </p>
+                  ) : (
+                    overlayMeta
+                  )}
+                </div>
               ) : m.media_url ? (
                 <div
                   onTouchStart={(e) => startLongPress(m, e.touches[0].clientX, e.touches[0].clientY)}
@@ -1129,6 +1247,9 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
       {uploadingImage && (
         <div className="border-t border-black/5 px-3 py-1.5 text-xs text-ink-muted dark:border-white/5">Sending image…</div>
       )}
+      {uploadingVideo && (
+        <div className="border-t border-black/5 px-3 py-1.5 text-xs text-ink-muted dark:border-white/5">Sending video…</div>
+      )}
       {uploadingVoice && (
         <div className="border-t border-black/5 px-3 py-1.5 text-xs text-ink-muted dark:border-white/5">Sending voice note…</div>
       )}
@@ -1139,7 +1260,7 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
         </div>
       ) : (
         <div className="relative flex shrink-0 items-center gap-2.5 border-t border-black/5 px-3 py-2.5 dark:border-white/5">
-          <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelected} className="hidden" />
+          <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleMediaSelected} className="hidden" />
 
           {recordingVoice ? (
             <VoiceRecordBar onCancel={() => setRecordingVoice(false)} onSend={sendVoiceNote} />
@@ -1156,20 +1277,25 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
           </button>
 
           {attachMenuOpen && (
-            <div className="absolute bottom-14 left-2 z-20 w-48 overflow-hidden rounded-xl2 glass-card shadow-lg">
-              <button
-                onClick={() => { setAttachMenuOpen(false); fileInputRef.current?.click(); }}
-                className="flex w-full items-center gap-2 px-4 py-3 text-left text-[15px]"
-              >
-                🖼️ Image
-              </button>
-              <button
-                onClick={() => { setAttachMenuOpen(false); setRecordingVoice(true); }}
-                className="flex w-full items-center gap-2 px-4 py-3 text-left text-[15px]"
-              >
-                🎤 Voice note
-              </button>
-            </div>
+            <>
+              {/* Full-screen invisible tap-catcher — closes the menu when you
+                  tap anywhere else, which it previously didn't do at all. */}
+              <div className="fixed inset-0 z-10" onClick={() => setAttachMenuOpen(false)} />
+              <div className="absolute bottom-14 left-2 z-20 w-48 overflow-hidden rounded-xl2 glass-card shadow-lg">
+                <button
+                  onClick={() => { setAttachMenuOpen(false); fileInputRef.current?.click(); }}
+                  className="flex w-full items-center gap-2 px-4 py-3 text-left text-[15px]"
+                >
+                  🖼️ Photo or video
+                </button>
+                <button
+                  onClick={() => { setAttachMenuOpen(false); setRecordingVoice(true); }}
+                  className="flex w-full items-center gap-2 px-4 py-3 text-left text-[15px]"
+                >
+                  🎤 Voice note
+                </button>
+              </div>
+            </>
           )}
 
           <textarea
@@ -1253,6 +1379,15 @@ export default function ChatThreadView({ conversationId }: { conversationId: str
           file={editingImageFile}
           onCancel={() => setEditingImageFile(null)}
           onSend={sendEditedImage}
+        />
+      )}
+
+      {editingVideoFile && (
+        <VideoPreview
+          file={editingVideoFile}
+          maxDurationSeconds={videoLimitSeconds}
+          onCancel={() => setEditingVideoFile(null)}
+          onSend={sendEditedVideo}
         />
       )}
 

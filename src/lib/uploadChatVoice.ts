@@ -13,11 +13,19 @@ export function pickVoiceMimeType(): string {
   return "";
 }
 
-// Images always come from compressImage as .webp (see uploadChatImage.ts).
-// Voice notes always land here with an audio extension, so we can tell them
-// apart from a message's media_url alone without a schema migration.
+// Images always come from compressImage as .webp (see uploadChatImage.ts);
+// chat videos always come from compressVideo as .webm with a "video-" prefix
+// (see uploadChatVideo.ts) — which, since compressVideo also outputs .webm,
+// means a voice note can no longer be told apart from a video by extension
+// alone. Voice notes are the only chat upload with a "voice-" filename
+// prefix, so that's the actual signal now.
+function basename(path: string): string {
+  const withoutQuery = path.split("?")[0];
+  return withoutQuery.slice(withoutQuery.lastIndexOf("/") + 1);
+}
+
 export function isVoiceNotePath(path: string): boolean {
-  return /\.(webm|m4a|mp3|ogg|wav|aac)$/i.test(path);
+  return /^voice-/i.test(basename(path));
 }
 
 export async function uploadChatVoice(blob: Blob, mimeType: string): Promise<string> {

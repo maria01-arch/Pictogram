@@ -7,6 +7,7 @@ import { useTopLoading } from "./TopLoadingBar";
 import { ConversationListSkeleton } from "./Skeleton";
 import { isOnline } from "@/lib/presence";
 import { isVoiceNotePath } from "@/lib/uploadChatVoice";
+import { isChatVideoPath } from "@/lib/uploadChatVideo";
 import { hideConversation, reportConversation } from "@/lib/conversationActions";
 import { ensureAiConversation, AI_BOT_USERNAME } from "@/lib/aiBot";
 import { blockUser } from "@/lib/block";
@@ -65,7 +66,9 @@ export default function ConversationList() {
         (row.last_media_url
           ? isVoiceNotePath(row.last_media_url)
             ? "🎤 Voice message"
-            : "📷 Sent a photo"
+            : isChatVideoPath(row.last_media_url)
+              ? "📹 Sent a video"
+              : "📷 Sent a photo"
           : "Say hello 👋");
     }
 
